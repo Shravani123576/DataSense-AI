@@ -264,6 +264,39 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
         </div>
       )}
 
+      {/* Data Lineage Stage Progression Indicator */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: '16px',
+          padding: '16px 20px',
+          border: '1px solid #E2E8F0',
+          marginBottom: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          fontSize: '13px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontWeight: 700, color: '#0F3D3E' }}>Data Lineage:</span>
+          <span style={{ background: '#F1F5F9', color: '#475569', padding: '3px 10px', borderRadius: '6px', fontWeight: 600, fontSize: '11px' }}>
+            STAGE 1: ORIGINAL (Immutable)
+          </span>
+          <span style={{ color: '#94A3B8' }}>&rarr;</span>
+          <span style={{ background: '#ECFDF5', color: '#047857', padding: '3px 10px', borderRadius: '6px', fontWeight: 700, fontSize: '11px', border: '1px solid #A7F3D0' }}>
+            STAGE 2: CLEANED ({auditHistory.length} Approved Action{auditHistory.length === 1 ? '' : 's'})
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', color: '#64748B', fontSize: '12px' }}>
+          <span>Current Active Rows: <strong style={{ color: '#0F3D3E' }}>{dataset.metadata.rows.toLocaleString()}</strong></span>
+          <span>Health Grade: <strong style={{ color: '#EA580C' }}>{dataset.health.grade} ({dataset.health.overall_score}/100)</strong></span>
+        </div>
+      </div>
+
       {/* Main Grid: Recommendations on Left, Audit History on Right */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)', gap: '24px' }}>
         {/* Left Column: Recommendations */}

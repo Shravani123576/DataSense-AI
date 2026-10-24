@@ -525,6 +525,27 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
         "class_labels": class_labels,
     }
 
+    # Plain-English metric explanations
+    metric_explanations: Dict[str, str] = {}
+    if task_type == "classification":
+        metric_explanations = {
+            "accuracy": "Proportion of total held-out test predictions that were exactly correct.",
+            "f1_score": "Harmonic balance between precision and recall (robust against class imbalance).",
+            "precision": "Accuracy of positive predictions; fraction of predicted positive cases that were truly positive.",
+            "recall": "Sensitivity; fraction of actual positive observations in the test set successfully identified.",
+        }
+        if "roc_auc" in best_item.metrics:
+            metric_explanations["roc_auc"] = "Discrimination capability across decision thresholds (0.5 is random chance, 1.0 is optimal separation)."
+    else:
+        metric_explanations = {
+            "r2_score": f"Coefficient of determination (R²); proportion of variance in '{target_col}' explained by the model (1.0 is perfect prediction).",
+            "mae": f"Mean Absolute Error; average absolute error in original units of '{target_col}'.",
+            "rmse": f"Root Mean Squared Error; average prediction error with higher penalty for large errors in '{target_col}'.",
+        }
+
+    val_strategy = "80/20 train/test holdout split with isolated preprocessing pipeline (leakage-safe)"
+    verif_status = "Model verified: Out-of-sample held-out evaluation completed with isolated feature transformers"
+
     return AutoMLResponse(
         dataset_id=req.dataset_id,
         target_column=target_col,
@@ -543,7 +564,10 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
         limitations=limitations,
         chart_spec=leaderboard_chart,
         held_out_predictions=held_out_samples,
-        evaluation_chart_spec=eval_chart_spec
+        evaluation_chart_spec=eval_chart_spec,
+        metric_explanations=metric_explanations,
+        validation_strategy=val_strategy,
+        verification_status=verif_status
     )
 
 

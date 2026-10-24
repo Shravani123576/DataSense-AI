@@ -333,7 +333,7 @@ export const App: React.FC = () => {
                 }`}
               >
                 <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
-                <span>1. Understand</span>
+                <span>1. Understand & Quality</span>
               </button>
 
               <button
@@ -385,7 +385,7 @@ export const App: React.FC = () => {
                 }`}
               >
                 <MessageSquareCode className="w-4 h-4 text-[#0D9488]" />
-                <span>5. Agent Copilot</span>
+                <span>5. AI Copilot</span>
               </button>
 
               <button
@@ -467,6 +467,42 @@ export const App: React.FC = () => {
 
             {activeTab === 'review' && (
               <div className="space-y-6">
+                {/* Grounded Recommended Next Step Card */}
+                {profile.recommended_next_step && (
+                  <div className="bg-white p-5 rounded-3xl border border-[#FED7AA] shadow-xs flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-white via-white to-[#FFF7ED]/50 animate-in fade-in duration-200">
+                    <div className="flex items-start gap-3.5 max-w-2xl">
+                      <div className="w-10 h-10 rounded-2xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-[#EA580C] uppercase tracking-wider bg-[#FFF7ED] px-2 py-0.5 rounded-full border border-[#FED7AA]">
+                            Recommended Next Step
+                          </span>
+                          <h3 className="font-heading font-bold text-sm md:text-base text-[#0F3D3E]">
+                            {profile.recommended_next_step.title}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#476D6D]">
+                          {profile.recommended_next_step.description}
+                        </p>
+                        <p className="text-[11px] text-[#648484] italic">
+                          <strong>Why:</strong> {profile.recommended_next_step.reason}
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setActiveTab(profile.recommended_next_step!.target_tab as any)}
+                      id="recommended-next-step-btn"
+                      className="flex items-center gap-2 bg-[#EA580C] hover:bg-[#C2410C] text-white px-5 py-2.5 rounded-full text-xs font-semibold transition-all shadow-xs cursor-pointer hover:translate-x-0.5"
+                    >
+                      <span>Proceed to {profile.recommended_next_step.target_tab === 'clean' ? 'Clean Studio' : profile.recommended_next_step.target_tab === 'predict' ? 'Predict Studio' : profile.recommended_next_step.target_tab === 'charts' ? 'Analyze' : 'Executive Brief'}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
                 {/* Health Overview & Pillar Gauges */}
                 <DataHealthRadar profile={profile} />
 

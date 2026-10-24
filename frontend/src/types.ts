@@ -57,6 +57,16 @@ export interface HealthScoreBreakdown {
   recommendations: string[];
 }
 
+export interface RecommendedNextStep {
+  action_type: 'clean' | 'analyze' | 'predict' | 'export';
+  title: string;
+  description: string;
+  reason: string;
+  target_tab: 'clean' | 'charts' | 'predict' | 'export';
+  priority: 'high' | 'medium' | 'low';
+  target_column?: string | null;
+}
+
 export interface ProfileReport {
   metadata: DatasetMetadata;
   columns: ColumnStat[];
@@ -67,6 +77,7 @@ export interface ProfileReport {
   suggested_questions: string[];
   is_restaurant_dataset?: boolean;
   restaurant_insights?: Record<string, any> | null;
+  recommended_next_step?: RecommendedNextStep | null;
 }
 
 export interface SampleDatasetInfo {
@@ -233,6 +244,9 @@ export interface AutoMLResponse {
   chart_spec?: ChartSpec | null;
   held_out_predictions?: HeldOutPredictionSample[] | null;
   evaluation_chart_spec?: ChartSpec | null;
+  metric_explanations?: Record<string, string> | null;
+  validation_strategy?: string | null;
+  verification_status?: string | null;
 }
 
 export interface WhatIfRequest {

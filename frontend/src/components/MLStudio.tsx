@@ -418,6 +418,31 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             <div style={{ marginTop: '14px', fontSize: '12px', color: '#64748B' }}>
               <strong>Generalization Assessment:</strong> {mlResult.overfitting_assessment}
             </div>
+
+            {/* Plain-English Metric Explanations Guide */}
+            {mlResult.metric_explanations && (
+              <div style={{ background: '#FAF8F5', borderRadius: '12px', padding: '16px 20px', border: '1px solid #E2E8F0', marginTop: '16px' }}>
+                <h5 style={{ fontSize: '13px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 10px' }}>
+                  Plain-English Metric Guide & Held-Out Scores
+                </h5>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                  {Object.entries(mlResult.metric_explanations).map(([k, desc]) => (
+                    <div key={k} style={{ background: '#FFFFFF', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
+                      <strong style={{ color: '#EA580C', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: '2px' }}>
+                        {k.replace('_', ' ')}: {mlResult.best_model_metrics[k] !== undefined ? mlResult.best_model_metrics[k] : ''}
+                      </strong>
+                      <span style={{ color: '#475569' }}>{desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Validation & Lineage Notice */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '10px 16px', borderRadius: '12px' }}>
+            <span style={{ fontWeight: 700, background: '#DCFCE7', padding: '2px 8px', borderRadius: '6px' }}>VERIFIED</span>
+            <span><strong>Out-of-Sample Holdout:</strong> {mlResult.verification_status} &bull; <em>Strategy: {mlResult.validation_strategy}</em></span>
           </div>
 
           {/* Grid: Feature Importance on Left, What-If on Right */}

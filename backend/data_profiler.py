@@ -9,7 +9,8 @@ from models import (
     TopCategory,
     CorrelationPair,
     HealthScoreBreakdown,
-    ProfileReport
+    ProfileReport,
+    RecommendedNextStep
 )
 
 
@@ -574,6 +575,82 @@ def generate_suggested_questions(df: pd.DataFrame, columns_stats: List[ColumnSta
     return questions[:5]
 
 
+def generate_recommended_next_step(
+    df: pd.DataFrame,
+    metadata: DatasetMetadata,
+    health: HealthScoreBreakdown,
+    top_corrs: List[CorrelationPair],
+    columns_stats: List[ColumnStat]
+) -> RecommendedNextStep:
+    """
+    Intelligently determine the most valuable next step grounded in the current dataset.
+    Prioritizes data hygiene, predictive opportunities, notable correlations, or executive summary.
+    """
+    # 1. Critical Data Hygiene
+    if metadata.duplicate_rows > 0 or metadata.missing_percentage > 5.0:
+        dup_text = f"{metadata.duplicate_rows} duplicate record(s)" if metadata.duplicate_rows > 0 else ""
+        missing_text = f"{metadata.missing_cells:,} missing value(s) ({metadata.missing_percentage}%)" if metadata.missing_percentage > 0 else ""
+        combined_issues = " and ".join([t for t in [dup_text, missing_text] if t])
+        return RecommendedNextStep(
+            action_type="clean",
+            title="Review & Clean Data Quality Issues",
+            description=f"Identified {combined_issues} in the active dataset.",
+            reason="Deduplicating records and imputing null values in Clean Studio prevents biased summaries and protects downstream ML models.",
+            target_tab="clean",
+            priority="high"
+        )
+
+    # 2. Candidate Target for Predictive Modeling
+    col_names_lower = {c: c.lower() for c in df.columns}
+    priority_keywords = [
+        "churn", "survived", "default", "converted", "status", "target", "label",
+        "price", "revenue", "fare", "charges", "salary", "rating", "cost"
+    ]
+    candidate_target = None
+    for kw in priority_keywords:
+        for orig, low in col_names_lower.items():
+            if kw == low or kw in low.split("_"):
+                if df[orig].nunique() >= 2 and df[orig].count() >= 15:
+                    candidate_target = orig
+                    break
+        if candidate_target:
+            break
+
+    if candidate_target:
+        return RecommendedNextStep(
+            action_type="predict",
+            title=f"Train Predictive Model for '{candidate_target}'",
+            description=f"'{candidate_target}' has clean distributions and at least 2 distinct values, making it an excellent candidate for supervised machine learning.",
+            reason="AutoML compares baseline dummies against competitive algorithms using isolated holdout test splits to verify genuine out-of-sample accuracy.",
+            target_tab="predict",
+            priority="medium",
+            target_column=candidate_target
+        )
+
+    # 3. Notable Correlations to Explore
+    if top_corrs and abs(top_corrs[0].correlation) >= 0.45:
+        pair = top_corrs[0]
+        return RecommendedNextStep(
+            action_type="analyze",
+            title=f"Analyze Relationship: '{pair.col1}' & '{pair.col2}'",
+            description=f"Detected a strong correlation of r = {pair.correlation} between '{pair.col1}' and '{pair.col2}'.",
+            reason="Plotting bivariate distributions in the Visualizer reveals non-linear patterns, clusters, and leverage points.",
+            target_tab="charts",
+            priority="medium",
+            target_column=pair.col1
+        )
+
+    # 4. Standard Executive Briefing
+    return RecommendedNextStep(
+        action_type="export",
+        title="Synthesize Executive Briefing & Export Report",
+        description="Dataset health is verified with no critical defects. Review comprehensive feature distributions and export reports.",
+        reason="Provides an auditable record of data hygiene and statistical properties ready for stakeholder distribution.",
+        target_tab="export",
+        priority="low"
+    )
+
+
 def profile_dataframe(
     df: pd.DataFrame,
     dataset_id: str,
@@ -637,6 +714,15 @@ def profile_dataframe(
         
     suggested = preset_questions if preset_questions else generate_suggested_questions(df, columns_stats, is_restaurant)
     
+    # Generate intelligent grounded next step
+    rec_step = generate_recommended_next_step(
+        df=df,
+        metadata=metadata,
+        health=health,
+        top_corrs=top_corrs,
+        columns_stats=columns_stats
+    )
+
     return ProfileReport(
         metadata=metadata,
         columns=columns_stats,
@@ -646,6 +732,7 @@ def profile_dataframe(
         preview_rows=preview_rows,
         suggested_questions=suggested,
         is_restaurant_dataset=is_restaurant,
-        restaurant_insights=restaurant_insights
+        restaurant_insights=restaurant_insights,
+        recommended_next_step=rec_step
     )
 

@@ -63,6 +63,16 @@ class HealthScoreBreakdown(BaseModel):
     recommendations: List[str]
 
 
+class RecommendedNextStep(BaseModel):
+    action_type: str  # 'clean', 'analyze', 'predict', 'export'
+    title: str
+    description: str
+    reason: str
+    target_tab: str  # 'clean', 'charts', 'predict', 'export'
+    priority: str  # 'high', 'medium', 'low'
+    target_column: Optional[str] = None
+
+
 class ProfileReport(BaseModel):
     metadata: DatasetMetadata
     columns: List[ColumnStat]
@@ -73,6 +83,7 @@ class ProfileReport(BaseModel):
     suggested_questions: List[str]
     is_restaurant_dataset: bool = False
     restaurant_insights: Optional[Dict[str, Any]] = None
+    recommended_next_step: Optional[RecommendedNextStep] = None
 
 
 class SampleDatasetInfo(BaseModel):
@@ -238,6 +249,9 @@ class AutoMLResponse(BaseModel):
     chart_spec: Optional[ChartSpec] = None
     held_out_predictions: Optional[List[HeldOutPredictionSample]] = None
     evaluation_chart_spec: Optional[ChartSpec] = None
+    metric_explanations: Optional[Dict[str, str]] = None
+    validation_strategy: Optional[str] = "Held-out test split (isolated preprocessing)"
+    verification_status: Optional[str] = "Model evaluated on unseen holdout test split"
 
 
 class WhatIfRequest(BaseModel):

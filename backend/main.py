@@ -375,10 +375,10 @@ def export_summary_report(dataset_id: str):
 @app.get("/api/dataset/{dataset_id}/export/cleaned")
 def export_cleaned_dataset(
     dataset_id: str,
-    deduplicate: bool = Query(True),
-    impute_numeric: bool = Query(True)
+    deduplicate: bool = Query(False, description="Apply auto-deduplication if not already applied"),
+    impute_numeric: bool = Query(False, description="Apply auto-median imputation if not already applied")
 ):
-    """Export cleaned version of the active dataset with duplicates removed and numeric nulls imputed."""
+    """Export the active cleaned dataset with all user-approved transformations preserved."""
     if dataset_id not in DATASET_STORAGE:
         raise HTTPException(status_code=404, detail="Dataset not found.")
 

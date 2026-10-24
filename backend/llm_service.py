@@ -142,13 +142,15 @@ ANALYTICAL_STOPWORDS = {
     "count", "rows", "columns", "features", "shape", "size", "records", "dimensions", 
     "dataset", "data", "table", "missing", "null", "empty", "nan", "duplicate", "duplicates", 
     "outlier", "outliers", "clean", "quality", "health", "trend", "trends", "change", "growth", 
-    "correlation", "correlations", "relationship", "distribution", "summary", "stats", 
+    "correlation", "correlations", "relationship", "relationships", "pattern", "patterns", 
+    "appear", "insights", "findings", "distribution", "summary", "stats", 
     "statistics", "describe", "breakdown", "frequency", "categories", "preview", "head", 
     "first", "last", "more", "less", "greater", "above", "below", "where", "filter", "group", 
     "grouped", "best", "worst", "score", "scores", "rate", "rates", "ratio", "level", "value", 
     "values", "most", "least", "there", "have", "has", "can", "could", "would", "please", 
     "help", "me", "you", "about", "this", "that", "these", "those", "does", "did", "do",
-    "many", "much", "time", "date", "sample", "record", "file", "csv", "info", "overview"
+    "many", "much", "time", "date", "sample", "record", "file", "csv", "info", "overview",
+    "useful", "further", "next", "analysis", "explain", "why", "step", "recommend", "recommended"
 }
 
 
@@ -194,7 +196,155 @@ def heuristic_query_engine(df: pd.DataFrame, question: str) -> Dict[str, Any]:
 
     matched_num, matched_cat, matched_date = detect_mentioned_columns(question, df)
 
-    # 1. Missing values, Quality & Duplicates
+    # 1a. Biggest Data Quality Problems Diagnostic
+    if any(k in q for k in ["biggest data quality", "quality problem", "quality issue", "data quality finding", "health problem", "main data quality"]):
+        code = "pd.Series({'Total Rows': len(df), 'Duplicate Rows': int(df.duplicated().sum()), 'Missing Cells': int(df.isna().sum().sum()), 'Columns with Nulls': int((df.isna().sum() > 0).sum())})"
+        exec_res = execute_sandboxed_pandas(df, code)
+        dup_cnt = int(df.duplicated().sum())
+        missing_cnt = int(df.isna().sum().sum())
+        total_cells = len(df) * len(df.columns)
+        missing_pct = round(missing_cnt / total_cells * 100, 2) if total_cells > 0 else 0.0
+
+        findings = []
+        if dup_cnt > 0:
+            findings.append(f"• **{dup_cnt:,} Duplicate Row(s)** ({round(dup_cnt / len(df) * 100, 2)}% of dataset): Can inflate aggregations and bias machine learning.")
+        else:
+            findings.append("• **Zero Duplicate Rows**: Records are 100% unique.")
+
+        if missing_cnt > 0:
+            top_nulls = df.isna().sum().sort_values(ascending=False)
+            top_nulls = top_nulls[top_nulls > 0].head(3)
+            null_cols_str = ", ".join([f"`{c}` ({cnt:,} nulls)" for c, cnt in top_nulls.items()])
+            findings.append(f"• **{missing_cnt:,} Missing Cell(s)** ({missing_pct}% of all cells): Concentrated primarily in {null_cols_str}.")
+        else:
+            findings.append("• **100% Completeness**: Zero missing values detected across all columns.")
+
+        # Outlier diagnostic
+        num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        outlier_total = 0
+        for nc in num_cols:
+            s = df[nc].dropna()
+            if len(s) > 10:
+                iqr = s.quantile(0.75) - s.quantile(0.25)
+                if iqr > 0:
+                    outlier_total += int(((s < s.quantile(0.25) - 1.5 * iqr) | (s > s.quantile(0.75) + 1.5 * iqr)).sum())
+        if outlier_total > 0:
+            findings.append(f"• **{outlier_total:,} Statistical Outlier(s)** across numeric features: Detected outside 1.5x IQR Tukey bounds.")
+
+        findings_text = "\n".join(findings)
+        ans = f"**Data Quality Diagnosis for {len(df):,} records & {len(df.columns)} features:**\n\n{findings_text}\n\nReview proposed remediation strategies in **Clean Studio** to resolve these items."
+        return {
+            "code": code,
+            "exec_res": exec_res,
+            "answer": ans,
+            "suggestions": [
+                "Which columns have the most missing values?",
+                "Are there any duplicate rows?",
+                "What is the overall data quality score?"
+            ]
+        }
+
+    # 1b. Which columns have the most missing values
+    if any(k in q for k in ["most missing", "most null", "highest missing", "columns with missing", "which columns have missing"]):
+        code = "df.isna().sum()[df.isna().sum() > 0].sort_values(ascending=False)"
+        exec_res = execute_sandboxed_pandas(df, code)
+        null_counts = df.isna().sum().sort_values(ascending=False)
+        null_counts = null_counts[null_counts > 0]
+        if len(null_counts) == 0:
+            ans = f"None! Every column in this dataset has **0 missing values** across all **{len(df):,} records**."
+        else:
+            top_list = [f"1. **`{c}`**: {cnt:,} missing values ({round(cnt / len(df) * 100, 2)}%)" for c, cnt in null_counts.head(5).items()]
+            ans = f"Here are the columns with the highest missing values:\n\n" + "\n".join(top_list) + f"\n\nIn total, {len(null_counts)} column(s) contain missing values."
+        return {
+            "code": code,
+            "exec_res": exec_res,
+            "answer": ans,
+            "suggestions": [
+                "What are the biggest data quality problems?",
+                "What are the column names and data types?",
+                "Are there any duplicate rows?"
+            ]
+        }
+
+    # 1c. Patterns and Key Relationships Across the Dataset
+    if any(k in q for k in ["pattern", "patterns", "relationship", "relationships", "key patterns", "what patterns", "patterns appear"]):
+        num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        if len(num_cols) >= 2:
+            code = "df.select_dtypes(include=['number']).corr().unstack().sort_values(ascending=False)"
+            exec_res = execute_sandboxed_pandas(df, code)
+            corr_df = df[num_cols].dropna().corr()
+            pairs = []
+            for i in range(len(num_cols)):
+                for j in range(i + 1, len(num_cols)):
+                    c1, c2 = num_cols[i], num_cols[j]
+                    val = round(float(corr_df.loc[c1, c2]), 3)
+                    if not np.isnan(val):
+                        pairs.append((c1, c2, val, abs(val)))
+            pairs.sort(key=lambda x: x[3], reverse=True)
+            top_3 = pairs[:3]
+            if top_3:
+                findings_lines = [
+                    f"1. **{p[0]}** ↔ **{p[1]}**: Pearson r = **{p[2]}** ({'Strong' if p[3] >= 0.7 else ('Moderate' if p[3] >= 0.35 else 'Weak')} {'positive' if p[2] > 0 else 'negative'} correlation)"
+                    for p in top_3
+                ]
+                ans = (
+                    f"**Key patterns & relationships identified across {len(num_cols)} numeric features:**\n\n"
+                    + "\n".join(findings_lines)
+                    + f"\n\n*Important analytical distinction: While these features demonstrate statistical correlation, "
+                    f"observed correlation does not establish causation without controlled experimental evidence.*"
+                )
+            else:
+                ans = f"Calculated correlations across {len(num_cols)} numeric variables. No strong linear relationships (|r| ≥ 0.2) were observed."
+        else:
+            code = "df.describe(include='all')"
+            exec_res = execute_sandboxed_pandas(df, code)
+            ans = f"This dataset has {len(df.columns)} feature(s). At least two numeric columns are required to compute linear correlations and bivariate patterns."
+
+        return {
+            "code": code,
+            "exec_res": exec_res,
+            "answer": ans,
+            "suggestions": [
+                f"What is the correlation between {num_cols[0]} and {num_cols[1]}?" if len(num_cols) >= 2 else "What are the columns?",
+                "Which categories have the highest values?",
+                "Which further analysis would be useful?"
+            ]
+        }
+
+    # 1d. Further Analysis Recommendations
+    if any(k in q for k in ["further analysis", "next analysis", "what analysis would be useful", "recommended next", "what should i analyze", "next step", "further steps"]):
+        code = "pd.Series({'Rows': len(df), 'Columns': len(df.columns), 'Nulls': int(df.isna().sum().sum()), 'Duplicates': int(df.duplicated().sum())})"
+        exec_res = execute_sandboxed_pandas(df, code)
+        rec_actions = []
+        if df.duplicated().sum() > 0 or df.isna().sum().sum() > 0:
+            rec_actions.append(f"1. **Data Hygiene in Clean Studio**: Deduplicate and impute {int(df.isna().sum().sum())} missing values to prevent sample bias.")
+        else:
+            rec_actions.append("1. **Data Hygiene Verified**: Dataset is 100% complete with 0 duplicate rows.")
+
+        num_c = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])]
+        if len(num_c) >= 2:
+            rec_actions.append(f"2. **Bivariate Modeling in Analyze**: Investigate top correlations like `{num_c[0]}` vs `{num_c[1]}` using interactive Plotly scatter distributions.")
+        
+        # Check potential target
+        target_cand = next((c for c in df.columns if any(w in c.lower() for w in ["churn", "survived", "price", "rating", "fare", "sales", "default"])), None)
+        if target_cand:
+            rec_actions.append(f"3. **Predictive Modeling in Predict Studio**: Train an AutoML tournament to predict `{target_cand}` and compare baseline dummy against Random Forest.")
+        else:
+            rec_actions.append("3. **Executive Reporting in Executive Brief**: Synthesize dataset distributions and health diagnostics into a stakeholder document.")
+
+        ans = "**Recommended Further Analytical Steps:**\n\n" + "\n".join(rec_actions)
+        return {
+            "code": code,
+            "exec_res": exec_res,
+            "answer": ans,
+            "suggestions": [
+                "What are the biggest data quality problems?",
+                "What patterns or relationships appear in this dataset?",
+                "Show me the overall data quality score"
+            ]
+        }
+
+    # 1e. Standard Missing values & Duplicates fallback
     if any(k in q for k in ["missing", "null", "empty", "quality", "clean", "nan", "duplicate", "duplicates"]):
         if any(k in q for k in ["duplicate", "duplicates"]):
             dup_count = int(df.duplicated().sum())
@@ -471,7 +621,9 @@ def heuristic_query_engine(df: pd.DataFrame, question: str) -> Dict[str, Any]:
 
             ans = (
                 f"The Pearson correlation between **{c1}** and **{c2}** is **{r_val}**. "
-                f"This indicates {strength}. As {c1} changes, {c2} tends to move in the {sign} direction."
+                f"This indicates {strength}. As {c1} changes, {c2} tends to move in the {sign} direction.\n\n"
+                f"*Important analytical distinction: While these features demonstrate statistical correlation, "
+                f"observed correlation does not establish causation without controlled experimental evidence.*"
             )
 
             # Generate scatter plot

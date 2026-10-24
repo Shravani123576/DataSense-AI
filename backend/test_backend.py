@@ -558,3 +558,131 @@ def test_dataset_switching_invalidates_results():
     assert "couldn't find" in ans.lower() or "not present" in ans.lower() or "cannot answer" in ans.lower() or "churn" in ans.lower()
 
 
+def test_excel_upload_and_parsing():
+    """Verify parsing and profiling for real user-uploaded Excel (.xlsx) spreadsheets."""
+    import io
+    import pandas as pd
+    
+    # Generate in-memory Excel workbook with diverse column types
+    df_excel = pd.DataFrame({
+        "Customer_ID": [f"CUST_{i:03d}" for i in range(30)],
+        "Monthly_Charges": [round(45.0 + i * 1.5, 2) for i in range(30)],
+        "Contract_Type": ["Month-to-Month" if i % 2 == 0 else "Two-Year" for i in range(30)],
+        "Churn_Risk": [1 if i % 4 == 0 else 0 for i in range(30)]
+    })
+    excel_buffer = io.BytesIO()
+    df_excel.to_excel(excel_buffer, index=False, engine="openpyxl")
+    excel_buffer.seek(0)
+
+    files = {"file": ("customer_portfolio.xlsx", excel_buffer.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+    res = client.post("/api/upload", files=files)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["metadata"]["rows"] == 30
+    assert data["metadata"]["columns"] == 4
+    assert "Customer Portfolio" in data["metadata"]["name"]
+    assert data["health"]["overall_score"] >= 80
+    assert data["recommended_next_step"] is not None
+
+
+def test_grounded_recommended_next_step():
+    """Verify that Recommended Next Step accurately diagnoses hygiene vs predictive modeling."""
+    # 1. Dataset with duplicates and missing values must recommend 'clean'
+    dirty_csv = "A,B,Target\n1,10,0\n1,10,0\n,20,1\n3,,0\n4,40,1\n" + "\n".join([f"{i},{i*10},{i%2}" for i in range(5, 25)])
+    files = {"file": ("dirty_test.csv", dirty_csv.encode("utf-8"), "text/csv")}
+    res_dirty = client.post("/api/upload", files=files)
+    assert res_dirty.status_code == 200
+    rec_dirty = res_dirty.json()["recommended_next_step"]
+    assert rec_dirty["action_type"] == "clean"
+    assert rec_dirty["target_tab"] == "clean"
+    assert "clean" in rec_dirty["title"].lower()
+
+    # 2. Clean dataset with candidate target 'Churn' must recommend 'predict'
+    clean_csv = "CustomerID,Tenure,MonthlyCharges,Churn\n" + "\n".join([f"C{i},{i*2},{50+i%20},{i%2}" for i in range(1, 50)])
+    files_clean = {"file": ("clean_churn.csv", clean_csv.encode("utf-8"), "text/csv")}
+    res_clean = client.post("/api/upload", files=files_clean)
+    assert res_clean.status_code == 200
+    rec_clean = res_clean.json()["recommended_next_step"]
+    assert rec_clean["action_type"] == "predict"
+    assert rec_clean["target_tab"] == "predict"
+    assert "churn" in rec_clean["title"].lower()
+
+
+def test_export_cleaned_dataset_preserves_state():
+    """Verify that export/cleaned returns actual approved state without forced blanket mutations."""
+    res = client.post("/api/samples/load?sample_id=customer_churn")
+    assert res.status_code == 200
+    d_id = "sample_customer_churn"
+
+    # Export cleaned CSV directly
+    exp_res = client.get(f"/api/dataset/{d_id}/export/cleaned")
+    assert exp_res.status_code == 200
+    assert "text/csv" in exp_res.headers["content-type"]
+    
+    # Verify row count matches active dataset rows (CRLF safe)
+    lines = [line.strip() for line in exp_res.text.strip().splitlines() if line.strip()]
+    header = [c.strip() for c in lines[0].split(",")]
+    assert "Churn" in header
+    # 1 Header row + 141 data rows (140 + 1 duplicate)
+    assert len(lines) == res.json()["metadata"]["rows"] + 1
+
+
+def test_copilot_quality_and_patterns_questions():
+    """Verify Copilot answers for data quality problems, most missing values, patterns, and causation disclaimer."""
+    res = client.post("/api/samples/load?sample_id=ecommerce_sales")
+    d_id = "sample_ecommerce_sales"
+
+    # 1. Ask: What are the biggest data-quality problems?
+    q_qual = client.post("/api/query", json={"dataset_id": d_id, "question": "What are the biggest data quality problems?"})
+    assert q_qual.status_code == 200
+    ans_qual = q_qual.json()["answer_text"]
+    assert "data quality" in ans_qual.lower() or "records" in ans_qual.lower()
+    assert "clean studio" in ans_qual.lower() or "missing" in ans_qual.lower()
+
+    # 2. Ask: Which columns have the most missing values?
+    q_null = client.post("/api/query", json={"dataset_id": d_id, "question": "Which columns have the most missing values?"})
+    assert q_null.status_code == 200
+    ans_null = q_null.json()["answer_text"]
+    assert "missing" in ans_null.lower() or "null" in ans_null.lower()
+
+    # 3. Ask: What patterns or relationships appear in this dataset?
+    q_patt = client.post("/api/query", json={"dataset_id": d_id, "question": "What patterns or relationships appear in this dataset?"})
+    assert q_patt.status_code == 200
+    ans_patt = q_patt.json()["answer_text"]
+    assert "correlation" in ans_patt.lower() or "relationship" in ans_patt.lower()
+    assert "causation" in ans_patt.lower()  # Must include correlation vs causation disclaimer!
+
+    # 4. Ask: Which further analysis would be useful?
+    q_next = client.post("/api/query", json={"dataset_id": d_id, "question": "Which further analysis would be useful?"})
+    assert q_next.status_code == 200
+    ans_next = q_next.json()["answer_text"]
+    assert "recommended" in ans_next.lower() or "analysis" in ans_next.lower()
+
+
+def test_automl_plain_english_metric_explanations():
+    """Verify that AutoML responses include plain-English metric explanations and verification status."""
+    res = client.post("/api/samples/load?sample_id=customer_churn")
+    d_id = "sample_customer_churn"
+
+    ml_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Churn",
+        "task_type": "classification"
+    })
+    assert ml_res.status_code == 200
+    data = ml_res.json()
+
+    assert "metric_explanations" in data
+    exps = data["metric_explanations"]
+    assert "accuracy" in exps
+    assert "f1_score" in exps
+    assert "precision" in exps
+    assert "recall" in exps
+
+    assert "verification_status" in data
+    assert "verified" in data["verification_status"].lower()
+    assert "validation_strategy" in data
+    assert "holdout" in data["validation_strategy"].lower()
+
+
+
