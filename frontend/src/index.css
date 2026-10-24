@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   DataSense AI — Warm Light Minimal Design System
+   Palette: Warm Off-White (#FAF8F5), Dark Teal (#0F3D3E), Subtle Orange (#EA580C)
+   ========================================================================== */
+
+:root {
+  --bg-main: #FAF8F5;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F5F2EB;
+  --bg-soft-hover: #F8F6F1;
+
+  --border-warm: #EAE6DF;
+  --border-subtle: #F0EDE6;
+  --border-focus: #EA580C;
+
+  --text-dark: #0F3D3E;
+  --text-medium: #2D5555;
+  --text-muted: #648484;
+  --text-light: #8FA6A6;
+
+  --accent-orange: #EA580C;
+  --accent-orange-hover: #C2410C;
+  --accent-orange-light: #FFF7ED;
+  --accent-orange-border: #FED7AA;
+
+  --accent-teal: #0D9488;
+  --accent-teal-light: #F0FDFA;
+  --accent-teal-border: #CCECE6;
+
+  --accent-amber: #D97706;
+  --accent-amber-light: #FEF3C7;
+
+  --accent-emerald: #059669;
+  --accent-emerald-light: #ECFDF5;
+
+  --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+
+  --shadow-warm-sm: 0 1px 3px rgba(15, 61, 62, 0.04), 0 1px 2px rgba(15, 61, 62, 0.02);
+  --shadow-warm-md: 0 4px 16px -2px rgba(15, 61, 62, 0.06), 0 2px 6px -1px rgba(15, 61, 62, 0.03);
+  --shadow-warm-lg: 0 10px 25px -3px rgba(15, 61, 62, 0.08), 0 4px 10px -2px rgba(15, 61, 62, 0.04);
+}
+
+/* Global Reset */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-heading);
+  color: var(--text-dark);
+}
+
+/* Base Card Style */
+.datasense-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-warm);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-warm-sm);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.datasense-card:hover {
+  border-color: #DFDBD3;
+  box-shadow: var(--shadow-warm-md);
+}
+
+/* Subtle Interactive Buttons */
+.btn-primary {
+  background-color: var(--accent-orange);
+  color: #FFFFFF;
+  border-radius: 9999px;
+  padding: 8px 18px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-orange-hover);
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.25);
+}
+
+.btn-secondary {
+  background-color: #FFFFFF;
+  color: var(--text-dark);
+  border: 1px solid var(--border-warm);
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-subtle);
+  border-color: #DFDBD3;
+}
+
+/* Warm Tabs */
+.tab-pill {
+  padding: 8px 18px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-medium);
+}
+
+.tab-pill:hover {
+  color: var(--text-dark);
+  background-color: var(--bg-subtle);
+}
+
+.tab-pill.active {
+  background-color: #FFFFFF;
+  color: var(--accent-orange);
+  box-shadow: var(--shadow-warm-sm);
+  font-weight: 600;
+}
+
+/* Custom Clean Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D5D0C7;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B2A6;
+}
