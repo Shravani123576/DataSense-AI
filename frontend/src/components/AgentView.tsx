@@ -52,37 +52,17 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
         style={{
           background: '#FFFFFF',
           padding: '24px',
-          borderRadius: '16px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 4px 16px rgba(15, 61, 62, 0.04)',
+          borderRadius: '20px',
+          border: '1px solid #EAE6DF',
+          boxShadow: '0 2px 10px rgba(15, 61, 62, 0.04)',
           marginBottom: '24px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span
-            style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#EA580C',
-              textTransform: 'uppercase',
-              letterSpacing: '0.6px',
-              background: '#FFF7ED',
-              padding: '4px 10px',
-              borderRadius: '8px',
-            }}
-          >
-            Autonomous Agent Orchestration
-          </span>
-          <span style={{ fontSize: '13px', color: '#64748B' }}>
-            Multi-Step Planning & Verified Tool Execution
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 800, color: '#0F3D3E', margin: 0 }}>
+            Goal Planner
+          </h2>
         </div>
-        <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F3D3E', margin: '8px 0 4px' }}>
-          Data Science Copilot & Goal Planner
-        </h2>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 20px' }}>
-          State your data science objective in plain English. The agent formulates a step-by-step plan, asks for clarification when parameters are missing, executes verified tools, and summarizes results.
-        </p>
 
         {/* Goal Input Box */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
@@ -94,11 +74,11 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
             onKeyDown={(e) => e.key === 'Enter' && handleExecute()}
             style={{
               flex: 1,
-              padding: '12px 18px',
-              borderRadius: '12px',
+              padding: '14px 20px',
+              borderRadius: '14px',
               border: '1.5px solid #CBD5E1',
-              fontSize: '14px',
-              color: '#1E293B',
+              fontSize: '16px',
+              color: '#0F3D3E',
               outline: 'none',
               background: '#FAF8F5',
             }}
@@ -110,9 +90,9 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
               background: '#0F3D3E',
               color: '#FFFFFF',
               border: 'none',
-              borderRadius: '12px',
-              padding: '12px 24px',
-              fontSize: '14px',
+              borderRadius: '14px',
+              padding: '14px 28px',
+              fontSize: '16px',
               fontWeight: 700,
               cursor: isRunning ? 'not-allowed' : 'pointer',
               opacity: isRunning ? 0.7 : 1,
@@ -126,8 +106,8 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
               <>
                 <span
                   style={{
-                    width: '14px',
-                    height: '14px',
+                    width: '16px',
+                    height: '16px',
                     border: '2px solid #FFFFFF',
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
@@ -138,7 +118,7 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
               </>
             ) : (
               <>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M5 12h14M12 5l7 7-7 7" />
                 </svg>
                 Execute Goal
@@ -148,8 +128,8 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
         </div>
 
         {/* Preset Suggestions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px', color: '#94A3B8', fontWeight: 600 }}>Try objective:</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '14px', color: '#64748B', fontWeight: 600 }}>Try objective:</span>
           {presetGoals.map((p, idx) => (
             <button
               key={idx}
@@ -160,10 +140,10 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
               style={{
                 background: '#FAF8F5',
                 border: '1px solid #E2E8F0',
-                borderRadius: '8px',
-                padding: '6px 12px',
-                fontSize: '12px',
-                color: '#475569',
+                borderRadius: '10px',
+                padding: '8px 14px',
+                fontSize: '13px',
+                color: '#334155',
                 cursor: 'pointer',
                 textAlign: 'left',
               }}
@@ -203,12 +183,12 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <span style={{ fontSize: '20px' }}>&bull;</span>
-            <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 700, color: '#92400E' }}>
+            <span style={{ fontSize: '22px' }}>&bull;</span>
+            <h3 style={{ margin: 0, fontSize: '20px', fontWeight: 700, color: '#92400E' }}>
               Clarification Needed to Proceed
             </h3>
           </div>
-          <p style={{ fontSize: '14px', color: '#78350F', margin: '0 0 16px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '15px', color: '#78350F', margin: '0 0 16px', lineHeight: 1.6 }}>
             {agentResponse.clarification_question}
           </p>
 
@@ -221,9 +201,9 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
                   background: '#EA580C',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: '10px',
-                  padding: '8px 16px',
-                  fontSize: '13px',
+                  borderRadius: '12px',
+                  padding: '10px 20px',
+                  fontSize: '14px',
                   fontWeight: 600,
                   cursor: 'pointer',
                   boxShadow: '0 2px 6px rgba(234, 88, 12, 0.25)',
@@ -243,21 +223,21 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
           <div
             style={{
               background: '#FFFFFF',
-              borderRadius: '16px',
+              borderRadius: '20px',
               padding: '24px',
-              border: '1px solid #E2E8F0',
+              border: '1px solid #EAE6DF',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
                 Step-by-Step Analysis Plan
               </h3>
               <span
                 style={{
-                  fontSize: '12px',
+                  fontSize: '13px',
                   fontWeight: 600,
-                  padding: '4px 10px',
-                  borderRadius: '6px',
+                  padding: '5px 12px',
+                  borderRadius: '8px',
                   background: agentResponse.plan.is_completed ? '#ECFDF5' : '#FEF3C7',
                   color: agentResponse.plan.is_completed ? '#047857' : '#B45309',
                 }}
@@ -266,7 +246,7 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
               </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {agentResponse.plan.steps.map((step) => {
                 const isDone = step.status === 'completed';
                 const isFail = step.status === 'failed';
@@ -277,23 +257,23 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
                     style={{
                       borderLeft: `4px solid ${isDone ? '#059669' : isFail ? '#DC2626' : '#CBD5E1'}`,
                       background: '#FAF8F5',
-                      padding: '16px',
-                      borderRadius: '0 12px 12px 0',
+                      padding: '16px 20px',
+                      borderRadius: '0 14px 14px 0',
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 700, color: '#64748B' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: 700, color: '#64748B' }}>
                           Step {step.step_number}
                         </span>
-                        <strong style={{ fontSize: '14px', color: '#1E293B' }}>{step.title}</strong>
+                        <strong style={{ fontSize: '16px', color: '#0F3D3E' }}>{step.title}</strong>
                         <span
                           style={{
-                            fontSize: '11px',
+                            fontSize: '12px',
                             background: '#E2E8F0',
                             color: '#475569',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
                             fontWeight: 600,
                           }}
                         >
@@ -303,14 +283,14 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {step.execution_time_ms && (
-                          <span style={{ fontSize: '11px', color: '#94A3B8' }}>{step.execution_time_ms} ms</span>
+                          <span style={{ fontSize: '12px', color: '#94A3B8' }}>{step.execution_time_ms} ms</span>
                         )}
                         <span
                           style={{
-                            fontSize: '11px',
+                            fontSize: '12px',
                             fontWeight: 700,
-                            padding: '2px 8px',
-                            borderRadius: '4px',
+                            padding: '3px 10px',
+                            borderRadius: '6px',
                             textTransform: 'uppercase',
                             background: isDone ? '#D1FAE5' : isFail ? '#FEE2E2' : '#F1F5F9',
                             color: isDone ? '#065F46' : isFail ? '#991B1B' : '#64748B',
@@ -322,7 +302,7 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
                     </div>
 
                     {step.result_summary && (
-                      <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#475569', lineHeight: 1.5 }}>
+                      <p style={{ margin: '8px 0 0', fontSize: '15px', color: '#475569', lineHeight: 1.6 }}>
                         {step.result_summary}
                       </p>
                     )}
@@ -337,17 +317,17 @@ export const AgentView: React.FC<AgentViewProps> = ({ dataset }) => {
             <div
               style={{
                 background: '#FFFFFF',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #EAE6DF',
               }}
             >
-              <h3 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 14px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
                 Verified Key Findings
               </h3>
-              <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {agentResponse.findings.map((finding, idx) => (
-                  <li key={idx} style={{ fontSize: '14px', color: '#334155', lineHeight: 1.5 }}>
+                  <li key={idx} style={{ fontSize: '15px', color: '#334155', lineHeight: 1.6 }}>
                     {finding}
                   </li>
                 ))}

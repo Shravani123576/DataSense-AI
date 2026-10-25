@@ -110,21 +110,21 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
   return (
     <div className="flex flex-col space-y-4 max-w-5xl mx-auto">
       {/* Recommended Beginner Questions Row */}
-      <div className="bg-white p-3.5 rounded-2xl border border-[#EAE6DF] shadow-xs">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-[#476D6D] uppercase tracking-wider mb-2.5">
-          <Sparkles className="w-3.5 h-3.5 text-[#EA580C]" />
-          <span>Recommended Questions for {profile.metadata.name}:</span>
+      <div className="bg-white p-4 rounded-2xl border border-[#EAE6DF] shadow-xs">
+        <div className="flex items-center gap-2 text-sm font-bold text-[#0F3D3E] mb-3">
+          <Sparkles className="w-4 h-4 text-[#EA580C]" />
+          <span>Recommended Questions:</span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2.5">
           {profile.suggested_questions.map((prompt, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(prompt)}
               disabled={isLoading}
-              className="text-xs bg-[#FAF8F5] hover:bg-[#FFF7ED] text-[#0F3D3E] hover:text-[#EA580C] px-3.5 py-1.5 rounded-full border border-[#EAE6DF] transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+              className="text-sm bg-[#FAF8F5] hover:bg-[#FFF7ED] text-[#0F3D3E] hover:text-[#EA580C] px-4 py-2 rounded-full border border-[#EAE6DF] transition-all flex items-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50 font-medium"
             >
               <span>{prompt}</span>
-              <ArrowRight className="w-3 h-3 text-[#EA580C]/70" />
+              <ArrowRight className="w-3.5 h-3.5 text-[#EA580C]/70" />
             </button>
           ))}
         </div>
@@ -136,9 +136,9 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
           if (msg.sender === 'user') {
             return (
               <div key={msg.id} className="flex justify-end">
-                <div className="max-w-xl bg-[#0F3D3E] text-white px-4 py-2.5 rounded-2xl rounded-tr-xs shadow-xs space-y-1">
-                  <div className="text-sm">{msg.text}</div>
-                  <div className="text-[10px] text-white/60 text-right">{msg.timestamp}</div>
+                <div className="max-w-xl bg-[#0F3D3E] text-white px-5 py-3 rounded-2xl rounded-tr-xs shadow-xs space-y-1">
+                  <div className="text-base">{msg.text}</div>
+                  <div className="text-xs text-white/60 text-right">{msg.timestamp}</div>
                 </div>
               </div>
             );
@@ -149,34 +149,34 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
           const isCodeExpanded = expandedCodeIds.has(msg.id);
 
           return (
-            <div key={msg.id} className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0 shadow-2xs mt-1">
-                <Sparkles className="w-4 h-4 fill-current/20" />
+            <div key={msg.id} className="flex items-start gap-3.5">
+              <div className="w-9 h-9 rounded-full bg-[#EA580C] text-white flex items-center justify-center shrink-0 shadow-2xs mt-1">
+                <Sparkles className="w-5 h-5 fill-current/20" />
               </div>
 
-              <div className="flex-1 bg-white rounded-2xl border border-[#EAE6DF] shadow-xs p-5 space-y-4">
+              <div className="flex-1 bg-white rounded-2xl border border-[#EAE6DF] shadow-xs p-6 space-y-4">
                 {/* Header status bar */}
                 {resp && (
-                  <div className="flex items-center justify-between text-xs pb-3 border-b border-[#F0EDE6]">
-                    <div className="flex items-center gap-1.5 text-[#047857] font-semibold bg-[#ECFDF5] px-2.5 py-1 rounded-full border border-[#A7F3D0]">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#047857]" />
-                      <span>100% Grounded Pandas Result</span>
+                  <div className="flex items-center justify-between text-sm pb-3 border-b border-[#F0EDE6]">
+                    <div className="flex items-center gap-1.5 text-[#047857] font-semibold bg-[#ECFDF5] px-3 py-1 rounded-full border border-[#A7F3D0]">
+                      <CheckCircle2 className="w-4 h-4 text-[#047857]" />
+                      <span>Grounded Pandas Result</span>
                     </div>
-                    <div className="flex items-center gap-1 text-[#648484]">
-                      <Clock className="w-3 h-3" />
+                    <div className="flex items-center gap-1.5 text-[#648484] text-xs">
+                      <Clock className="w-3.5 h-3.5" />
                       <span>{resp.execution_time_ms} ms</span>
                     </div>
                   </div>
                 )}
 
                 {/* Plain English explanation with bold numbers */}
-                <div className="text-sm md:text-base text-[#0F3D3E] leading-relaxed">
+                <div className="text-base text-[#0F3D3E] leading-relaxed">
                   {resp ? (
                     <div
                       dangerouslySetInnerHTML={{
                         __html: resp.answer_text
-                          .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-[#EA580C] bg-[#FFF7ED] px-1 py-0.5 rounded">$1</strong>')
-                          .replace(/`(.*?)`/g, '<code class="bg-[#F5F2EB] text-[#0F3D3E] px-1 py-0.5 rounded text-xs font-mono">$1</code>'),
+                          .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-[#EA580C] bg-[#FFF7ED] px-1.5 py-0.5 rounded">$1</strong>')
+                          .replace(/`(.*?)`/g, '<code class="bg-[#F5F2EB] text-[#0F3D3E] px-1.5 py-0.5 rounded text-sm font-mono">$1</code>'),
                       }}
                     />
                   ) : (
@@ -184,7 +184,7 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
                       dangerouslySetInnerHTML={{
                         __html: (msg.text || '')
                           .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-[#EA580C]">$1</strong>')
-                          .replace(/`(.*?)`/g, '<code class="bg-[#F5F2EB] px-1 py-0.5 rounded text-xs font-mono">$1</code>'),
+                          .replace(/`(.*?)`/g, '<code class="bg-[#F5F2EB] px-1.5 py-0.5 rounded text-sm font-mono">$1</code>'),
                       }}
                     />
                   )}
@@ -192,11 +192,11 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
 
                 {/* Primary Metric Figures Strip */}
                 {resp && Object.keys(resp.summary_figures).length > 0 && (
-                  <div className="flex flex-wrap gap-2 pt-1">
+                  <div className="flex flex-wrap gap-2.5 pt-1">
                     {Object.entries(resp.summary_figures).map(([k, v], i) => (
                       <div
                         key={i}
-                        className="bg-[#FAF8F5] border border-[#EAE6DF] px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5"
+                        className="bg-[#FAF8F5] border border-[#EAE6DF] px-3.5 py-2 rounded-xl text-sm flex items-center gap-2"
                       >
                         <span className="text-[#476D6D] font-medium capitalize">{k.replace(/_/g, ' ')}:</span>
                         <strong className="text-[#0F3D3E] font-bold">{String(v)}</strong>
@@ -208,23 +208,23 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
                 {/* Interactive Chart (Plotly) */}
                 {resp && resp.chart_spec && (
                   <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-[#EAE6DF]">
-                    <PlotlyChart spec={resp.chart_spec} plotlySpec={resp.chart_spec.plotly_spec} height={280} />
+                    <PlotlyChart spec={resp.chart_spec} plotlySpec={resp.chart_spec.plotly_spec} height={300} />
                   </div>
                 )}
 
                 {/* Table Preview (if multiple rows returned) */}
                 {resp && resp.table_result && resp.table_result.length > 0 && (
                   <div className="bg-[#FAF8F5] rounded-xl border border-[#EAE6DF] overflow-hidden">
-                    <div className="px-3.5 py-2 bg-[#F5F2EB] border-b border-[#EAE6DF] text-xs font-medium text-[#476D6D] flex items-center gap-1.5">
-                      <TableIcon className="w-3.5 h-3.5 text-[#EA580C]" />
-                      <span>Computed Result Table ({resp.table_result.length} rows)</span>
+                    <div className="px-4 py-2.5 bg-[#F5F2EB] border-b border-[#EAE6DF] text-sm font-semibold text-[#0F3D3E] flex items-center gap-2">
+                      <TableIcon className="w-4 h-4 text-[#EA580C]" />
+                      <span>Result Table ({resp.table_result.length} rows)</span>
                     </div>
                     <div className="overflow-x-auto max-h-60">
-                      <table className="w-full text-xs text-left">
+                      <table className="w-full text-sm text-left">
                         <thead>
                           <tr className="bg-[#FAF8F5] text-[#476D6D] border-b border-[#EAE6DF]">
                             {(resp.table_columns || Object.keys(resp.table_result[0])).map((col, i) => (
-                              <th key={i} className="px-3 py-2 font-semibold">{col}</th>
+                              <th key={i} className="px-3.5 py-2.5 font-semibold">{col}</th>
                             ))}
                           </tr>
                         </thead>
@@ -232,7 +232,7 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
                           {resp.table_result.slice(0, 15).map((row, rIdx) => (
                             <tr key={rIdx} className="hover:bg-white transition-colors">
                               {(resp.table_columns || Object.keys(row)).map((col, cIdx) => (
-                                <td key={cIdx} className="px-3 py-1.5 text-[#0F3D3E]">
+                                <td key={cIdx} className="px-3.5 py-2 text-[#0F3D3E]">
                                   {row[col] !== null ? String(row[col]) : '-'}
                                 </td>
                               ))}
@@ -249,39 +249,39 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
                   <div className="border border-[#EAE6DF] rounded-xl overflow-hidden bg-[#FAF8F5]">
                     <button
                       onClick={() => toggleCode(msg.id)}
-                      className="w-full px-3.5 py-2 text-xs font-medium text-[#476D6D] flex items-center justify-between hover:bg-[#F5F2EB] transition-colors cursor-pointer"
+                      className="w-full px-4 py-2.5 text-sm font-medium text-[#476D6D] flex items-center justify-between hover:bg-[#F5F2EB] transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center gap-1.5 text-[#0F3D3E]">
-                        <Code2 className="w-3.5 h-3.5 text-[#EA580C]" />
-                        <span>Verified Python Pandas Code</span>
+                      <div className="flex items-center gap-2 text-[#0F3D3E]">
+                        <Code2 className="w-4 h-4 text-[#EA580C]" />
+                        <span className="font-semibold">Python Execution Code</span>
                       </div>
-                      <div className="flex items-center gap-1 text-[11px] text-[#648484]">
-                        {isCodeExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      <div className="flex items-center gap-1 text-xs text-[#648484]">
+                        {isCodeExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </div>
                     </button>
 
                     {isCodeExpanded && (
-                      <div className="p-3 bg-white border-t border-[#EAE6DF] space-y-2">
+                      <div className="p-3.5 bg-white border-t border-[#EAE6DF] space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-[11px] text-[#648484] font-mono">AST-Validated Safe Execution</span>
+                          <span className="text-xs text-[#648484] font-mono">AST-Validated Sandbox</span>
                           <button
                             onClick={() => copyCode(msg.id, resp.code_executed)}
-                            className="text-xs text-[#0F3D3E] hover:text-[#EA580C] flex items-center gap-1 bg-[#FAF8F5] px-2 py-1 rounded border border-[#EAE6DF] cursor-pointer"
+                            className="text-xs text-[#0F3D3E] hover:text-[#EA580C] flex items-center gap-1.5 bg-[#FAF8F5] px-2.5 py-1.5 rounded-lg border border-[#EAE6DF] cursor-pointer font-medium"
                           >
                             {copiedId === msg.id ? (
                               <>
-                                <Check className="w-3 h-3 text-[#047857]" />
+                                <Check className="w-3.5 h-3.5 text-[#047857]" />
                                 <span>Copied!</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3 h-3" />
+                                <Copy className="w-3.5 h-3.5" />
                                 <span>Copy Code</span>
                               </>
                             )}
                           </button>
                         </div>
-                        <pre className="p-2.5 bg-[#FAF8F5] rounded-lg text-xs font-mono text-[#0F3D3E] overflow-x-auto border border-[#EAE6DF]">
+                        <pre className="p-3 bg-[#FAF8F5] rounded-xl text-xs font-mono text-[#0F3D3E] overflow-x-auto border border-[#EAE6DF]">
                           <code>{resp.code_executed}</code>
                         </pre>
                       </div>
@@ -291,9 +291,9 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
 
                 {/* Dynamic Follow-Up Suggestions */}
                 {resp && resp.follow_up_suggestions && resp.follow_up_suggestions.length > 0 && (
-                  <div className="pt-2 border-t border-[#F0EDE6] space-y-1.5">
-                    <span className="text-[11px] font-semibold text-[#648484] uppercase tracking-wider">
-                      Suggested Follow-Ups:
+                  <div className="pt-2 border-t border-[#F0EDE6] space-y-2">
+                    <span className="text-xs font-bold text-[#648484] uppercase tracking-wider">
+                      Follow-Up Questions:
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {resp.follow_up_suggestions.map((sug, sIdx) => (
@@ -301,10 +301,10 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
                           key={sIdx}
                           onClick={() => handleSend(sug)}
                           disabled={isLoading}
-                          className="text-xs bg-[#FAF8F5] hover:bg-[#FFF7ED] text-[#0F3D3E] hover:text-[#EA580C] px-3 py-1 rounded-full border border-[#EAE6DF] transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                          className="text-sm bg-[#FAF8F5] hover:bg-[#FFF7ED] text-[#0F3D3E] hover:text-[#EA580C] px-3.5 py-1.5 rounded-full border border-[#EAE6DF] transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
                           <span>{sug}</span>
-                          <ArrowRight className="w-3 h-3 text-[#EA580C]/70" />
+                          <ArrowRight className="w-3.5 h-3.5 text-[#EA580C]/70" />
                         </button>
                       ))}
                     </div>
@@ -322,7 +322,7 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
               <Sparkles className="w-4 h-4 fill-current/20" />
             </div>
             <div className="bg-white rounded-2xl border border-[#EAE6DF] px-4 py-3 text-sm text-[#476D6D] flex items-center gap-2 shadow-xs">
-              <div className="w-3.5 h-3.5 rounded-full border-2 border-[#EA580C] border-t-transparent animate-spin" />
+              <div className="w-4 h-4 rounded-full border-2 border-[#EA580C] border-t-transparent animate-spin" />
               <span>Analyzing dataset with sandboxed Pandas operations...</span>
             </div>
           </div>
@@ -335,7 +335,7 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
           e.preventDefault();
           handleSend(inputQuestion);
         }}
-        className="sticky bottom-4 bg-white p-2 rounded-2xl border border-[#EAE6DF] shadow-md flex items-center gap-2"
+        className="sticky bottom-4 bg-white p-2.5 rounded-2xl border border-[#EAE6DF] shadow-md flex items-center gap-3"
       >
         <input
           type="text"
@@ -343,15 +343,15 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
           onChange={(e) => setInputQuestion(e.target.value)}
           placeholder={`Ask about ${profile.metadata.name}... (e.g. "Which cuisine has the highest rating?")`}
           disabled={isLoading}
-          className="flex-1 bg-transparent px-4 py-2 text-sm text-[#0F3D3E] placeholder-[#648484] focus:outline-none"
+          className="flex-1 bg-transparent px-4 py-2.5 text-base text-[#0F3D3E] placeholder-[#648484] focus:outline-none"
         />
         <button
           type="submit"
           disabled={!inputQuestion.trim() || isLoading}
-          className="bg-[#EA580C] hover:bg-[#C2410C] text-white px-5 py-2.5 rounded-xl font-medium text-xs md:text-sm flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-40"
+          className="bg-[#EA580C] hover:bg-[#C2410C] text-white px-6 py-3 rounded-xl font-semibold text-base flex items-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-40"
         >
           <span>Ask Agent</span>
-          <Send className="w-3.5 h-3.5" />
+          <Send className="w-4 h-4" />
         </button>
       </form>
     </div>

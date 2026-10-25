@@ -163,65 +163,37 @@ export const App: React.FC = () => {
 
         {/* 1. ONBOARDING / EMPTY STATE: Upload Dataset or Pick Sample */}
         {!profile && !isLoading && (
-          <div className="space-y-8 py-4 animate-in fade-in duration-300">
+          <div className="space-y-8 py-6 animate-in fade-in duration-300">
             {/* Hero Card */}
             <div className="bg-white p-8 md:p-12 rounded-3xl border border-[#EAE6DF] shadow-xs text-center space-y-4 max-w-4xl mx-auto">
-              <div className="inline-flex items-center gap-2 bg-[#FFF7ED] text-[#EA580C] px-3.5 py-1.5 rounded-full text-xs font-bold border border-[#FED7AA]">
-                <Sparkles className="w-3.5 h-3.5 fill-current/20" />
-                <span>Beginner-Friendly AI Data Science Studio</span>
-              </div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-[#0F3D3E] tracking-tight font-heading">
-                Turn any spreadsheet into verified insights in seconds.
+                Turn spreadsheets into verified insights.
               </h1>
-              <p className="text-sm md:text-base text-[#476D6D] max-w-2xl mx-auto leading-relaxed">
-                Upload your CSV or Excel dataset. DataSense AI validates data types, detects anomalies, calculates accurate statistics, generates interactive Plotly charts, and answers questions in plain English—with zero mathematical hallucination.
+              <p className="text-base md:text-lg text-[#476D6D] max-w-2xl mx-auto leading-relaxed">
+                Upload your CSV or Excel dataset to profile quality, explore visual distributions, and build predictive machine learning models.
               </p>
-
-              {/* 4-Step Flow Pill Indicators */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 max-w-3xl mx-auto text-left">
-                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-[#EAE6DF]">
-                  <span className="text-[10px] font-bold text-[#EA580C] uppercase tracking-wider block">Step 1</span>
-                  <strong className="text-xs font-semibold text-[#0F3D3E] block">Upload Dataset</strong>
-                  <span className="text-[11px] text-[#648484]">CSV or Excel (100k+ rows)</span>
-                </div>
-                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-[#EAE6DF]">
-                  <span className="text-[10px] font-bold text-[#0D9488] uppercase tracking-wider block">Step 2</span>
-                  <strong className="text-xs font-semibold text-[#0F3D3E] block">Review Data</strong>
-                  <span className="text-[11px] text-[#648484]">Health score & quality audit</span>
-                </div>
-                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-[#EAE6DF]">
-                  <span className="text-[10px] font-bold text-[#6366F1] uppercase tracking-wider block">Step 3</span>
-                  <strong className="text-xs font-semibold text-[#0F3D3E] block">Ask Questions</strong>
-                  <span className="text-[11px] text-[#648484]">Plain English conversational AI</span>
-                </div>
-                <div className="bg-[#FAF8F5] p-3 rounded-2xl border border-[#EAE6DF]">
-                  <span className="text-[10px] font-bold text-[#059669] uppercase tracking-wider block">Step 4</span>
-                  <strong className="text-xs font-semibold text-[#0F3D3E] block">View Results</strong>
-                  <span className="text-[11px] text-[#648484]">Plotly charts & verified code</span>
-                </div>
-              </div>
 
               {/* Dropzone Area */}
               <div
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleDropFile}
                 onClick={() => setIsUploadOpen(true)}
-                className="mt-6 border-2 border-dashed border-[#FED7AA] hover:border-[#EA580C] bg-[#FFFBF5] hover:bg-[#FFF7ED]/50 rounded-3xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 group"
+                className="mt-6 border-2 border-dashed border-[#FED7AA] hover:border-[#EA580C] bg-[#FFFBF5] hover:bg-[#FFF7ED]/50 rounded-3xl p-10 transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 group"
               >
-                <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] text-[#EA580C] group-hover:scale-105 transition-transform flex items-center justify-center shadow-xs">
-                  <Upload className="w-6 h-6" />
+                <div className="w-16 h-16 rounded-2xl bg-[#FFF7ED] text-[#EA580C] group-hover:scale-105 transition-transform flex items-center justify-center shadow-xs">
+                  <Upload className="w-7 h-7" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-[#0F3D3E]">
-                    Drag & Drop your CSV or Excel file here
+                  <h3 className="text-lg font-bold text-[#0F3D3E]">
+                    Drag and drop your CSV or Excel file here
                   </h3>
-                  <p className="text-xs text-[#648484] mt-1">
-                    Supports .csv, .xlsx, and .xls spreadsheets up to 100,000+ rows
+                  <p className="text-sm text-[#648484] mt-1">
+                    Supports .csv and .xlsx files with up to 100,000+ rows
                   </p>
                 </div>
                 <button
                   type="button"
-                  className="bg-[#EA580C] hover:bg-[#C2410C] text-white px-5 py-2 rounded-full text-xs font-semibold transition-all shadow-xs cursor-pointer"
+                  className="bg-[#EA580C] hover:bg-[#C2410C] text-white px-6 py-2.5 rounded-full text-sm font-semibold transition-all shadow-xs cursor-pointer"
                 >
                   Browse Files
                 </button>
@@ -231,8 +203,8 @@ export const App: React.FC = () => {
             {/* Sample Datasets Grid */}
             <div className="max-w-4xl mx-auto space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#476D6D] uppercase tracking-wider">
-                  Or explore a beginner sample dataset:
+                <span className="text-sm font-bold text-[#476D6D] uppercase tracking-wider">
+                  Or explore a sample dataset:
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -244,32 +216,32 @@ export const App: React.FC = () => {
                   >
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-[#EA580C] bg-[#FFF7ED] px-2 py-0.5 rounded-full border border-[#FED7AA]">
+                        <span className="text-xs font-semibold text-[#EA580C] bg-[#FFF7ED] px-2.5 py-0.5 rounded-full border border-[#FED7AA]">
                           {s.category}
                         </span>
                         {s.id === 'bigdata_100k' && (
-                          <span className="text-[10px] font-bold text-[#4F46E5] bg-[#EEF2FF] px-1.5 py-0.5 rounded-md">
+                          <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-0.5 rounded-md">
                             100k+ Rows
                           </span>
                         )}
                         {s.id === 'zomato_restaurants' && (
-                          <span className="text-[10px] font-bold text-[#D97706] bg-[#FEF3C7] px-1.5 py-0.5 rounded-md">
+                          <span className="text-xs font-bold text-[#D97706] bg-[#FEF3C7] px-2 py-0.5 rounded-md">
                             Culinary
                           </span>
                         )}
                       </div>
-                      <h4 className="font-heading font-bold text-sm text-[#0F3D3E] group-hover:text-[#EA580C] transition-colors">
+                      <h4 className="font-heading font-bold text-base text-[#0F3D3E] group-hover:text-[#EA580C] transition-colors">
                         {s.name}
                       </h4>
-                      <p className="text-xs text-[#648484] line-clamp-2 leading-relaxed">
+                      <p className="text-sm text-[#648484] line-clamp-2 leading-relaxed">
                         {s.description}
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[#F5F2EB] text-[11px] text-[#476D6D]">
+                    <div className="flex items-center justify-between pt-2 border-t border-[#F5F2EB] text-xs font-medium text-[#476D6D]">
                       <span>{s.rows.toLocaleString()} rows • {s.columns} cols</span>
                       <span className="text-[#EA580C] font-semibold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                        Explore <ArrowRight className="w-3 h-3" />
+                        Explore <ArrowRight className="w-3.5 h-3.5" />
                       </span>
                     </div>
                   </button>
@@ -283,37 +255,37 @@ export const App: React.FC = () => {
         {profile && (
           <>
             {/* Active Dataset Banner with Clean Metrics */}
-            <div className="bg-white p-4 md:p-5 rounded-3xl border border-[#EAE6DF] shadow-xs flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0">
-                  <Database className="w-5 h-5" />
+            <div className="bg-white p-5 md:p-6 rounded-3xl border border-[#EAE6DF] shadow-xs flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0">
+                  <Database className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="font-heading font-bold text-base md:text-lg text-[#0F3D3E]">
+                  <div className="flex items-center gap-2.5">
+                    <h2 className="font-heading font-bold text-xl md:text-2xl text-[#0F3D3E]">
                       {profile.metadata.name}
                     </h2>
-                    <span className="text-[11px] font-bold bg-[#ECFDF5] text-[#059669] px-2.5 py-0.5 rounded-full border border-[#A7F3D0]">
-                      Quality Grade {profile.health.grade} ({profile.health.overall_score}/100)
+                    <span className="text-xs md:text-sm font-bold bg-[#ECFDF5] text-[#059669] px-3 py-0.5 rounded-full border border-[#A7F3D0]">
+                      Grade {profile.health.grade} ({profile.health.overall_score}/100)
                     </span>
                   </div>
-                  <p className="text-xs text-[#648484]">
-                    Source file: <code className="bg-[#FAF8F5] px-1.5 py-0.5 rounded border border-[#EAE6DF] text-[#0F3D3E]">{profile.metadata.filename}</code> • {profile.metadata.rows.toLocaleString()} records • {profile.metadata.columns} features • {profile.metadata.missing_cells} missing ({profile.metadata.missing_percentage}%)
+                  <p className="text-sm text-[#648484] mt-0.5">
+                    <code className="bg-[#FAF8F5] px-2 py-0.5 rounded border border-[#EAE6DF] text-[#0F3D3E] font-medium">{profile.metadata.filename}</code> • {profile.metadata.rows.toLocaleString()} records • {profile.metadata.columns} features • {profile.metadata.missing_cells} missing ({profile.metadata.missing_percentage}%)
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => setIsUploadOpen(true)}
-                  className="flex items-center gap-1.5 bg-[#FAF8F5] hover:bg-[#F5F2EB] text-[#0F3D3E] px-3.5 py-2 rounded-full border border-[#EAE6DF] text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                  className="flex items-center gap-2 bg-[#FAF8F5] hover:bg-[#F5F2EB] text-[#0F3D3E] px-4 py-2 rounded-full border border-[#EAE6DF] text-sm font-semibold transition-all cursor-pointer shadow-2xs"
                 >
-                  <Upload className="w-3.5 h-3.5 text-[#EA580C]" />
+                  <Upload className="w-4 h-4 text-[#EA580C]" />
                   <span>Upload Another File</span>
                 </button>
                 <button
                   onClick={handleResetDataset}
-                  className="p-2 hover:bg-[#FEF2F2] text-[#648484] hover:text-[#DC2626] rounded-full transition-colors cursor-pointer"
+                  className="p-2.5 hover:bg-[#FEF2F2] text-[#648484] hover:text-[#DC2626] rounded-full transition-colors cursor-pointer"
                   title="Close active dataset"
                 >
                   <RefreshCw className="w-4 h-4" />
@@ -321,84 +293,84 @@ export const App: React.FC = () => {
               </div>
             </div>
 
-            {/* 6-Stage Data Science Lifecycle Navigation Bar */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#F5F2EB] rounded-2xl border border-[#EAE6DF] w-fit overflow-x-auto max-w-full">
+            {/* Navigation Bar */}
+            <div className="flex items-center gap-2 p-1.5 bg-[#F5F2EB] rounded-2xl border border-[#EAE6DF] w-fit overflow-x-auto max-w-full">
               <button
                 onClick={() => setActiveTab('review')}
                 id="tab-understand-data"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'review'
-                    ? 'bg-white text-[#0F3D3E] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#0F3D3E] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <ShieldCheck className="w-4 h-4 text-[#0D9488]" />
-                <span>1. Understand & Quality</span>
+                <span>Data Quality</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('clean')}
                 id="tab-clean-studio"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'clean'
-                    ? 'bg-white text-[#EA580C] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#EA580C] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <Database className="w-4 h-4 text-[#EA580C]" />
-                <span>2. Clean Studio</span>
+                <span>Clean Data</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('charts')}
                 id="tab-visualizer"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'charts'
-                    ? 'bg-white text-[#0F3D3E] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#0F3D3E] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <BarChart3 className="w-4 h-4 text-[#6366F1]" />
-                <span>3. Analyze</span>
+                <span>Explore Data</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('predict')}
                 id="tab-predict-studio"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'predict'
-                    ? 'bg-white text-[#0F3D3E] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#0F3D3E] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <Sparkles className="w-4 h-4 text-[#EA580C]" />
-                <span>4. Predict (AutoML)</span>
+                <span>Predict</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('copilot')}
                 id="tab-copilot-agent"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'copilot'
-                    ? 'bg-white text-[#0F3D3E] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#0F3D3E] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <MessageSquareCode className="w-4 h-4 text-[#0D9488]" />
-                <span>5. AI Copilot</span>
+                <span>AI Copilot</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('export')}
                 id="tab-executive-report"
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === 'export'
-                    ? 'bg-white text-[#0F3D3E] shadow-xs font-bold border border-[#E2E8F0]'
+                    ? 'bg-white text-[#0F3D3E] shadow-xs border border-[#E2E8F0]'
                     : 'text-[#476D6D] hover:text-[#0F3D3E]'
                 }`}
               >
                 <FileText className="w-4 h-4 text-[#D97706]" />
-                <span>6. Executive Brief</span>
+                <span>Reports</span>
               </button>
 
               {/* Show Zomato Tab ONLY if the user explicitly loaded Zomato Bangalore Restaurants */}
@@ -406,14 +378,14 @@ export const App: React.FC = () => {
                 <button
                   onClick={() => setActiveTab('zomato')}
                   id="tab-zomato-hub"
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm md:text-base font-semibold transition-all cursor-pointer whitespace-nowrap ${
                     activeTab === 'zomato'
-                      ? 'bg-white text-[#EA580C] shadow-xs font-bold border border-[#E2E8F0]'
+                      ? 'bg-white text-[#EA580C] shadow-xs border border-[#E2E8F0]'
                       : 'text-[#476D6D] hover:text-[#0F3D3E]'
                   }`}
                 >
                   <Utensils className="w-4 h-4 text-[#EA580C]" />
-                  <span>Zomato Hub</span>
+                  <span>Restaurant Intel</span>
                 </button>
               )}
             </div>
@@ -430,26 +402,26 @@ export const App: React.FC = () => {
             {activeTab === 'copilot' && (
               <div className="space-y-4">
                 {/* Copilot Mode Sub-Toggle */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-[#EAE6DF] w-fit shadow-xs">
+                <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-[#EAE6DF] w-fit shadow-xs">
                   <button
                     onClick={() => setCopilotSubTab('chat')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                       copilotSubTab === 'chat'
                         ? 'bg-[#FAF8F5] text-[#EA580C] border border-[#FED7AA]'
                         : 'text-[#648484] hover:text-[#0F3D3E]'
                     }`}
                   >
-                    Plain-English Q&A (Grounded)
+                    Data Q&A
                   </button>
                   <button
                     onClick={() => setCopilotSubTab('planner')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                       copilotSubTab === 'planner'
                         ? 'bg-[#FAF8F5] text-[#0F3D3E] border border-[#CBD5E1]'
                         : 'text-[#648484] hover:text-[#0F3D3E]'
                     }`}
                   >
-                    Autonomous Goal Planner & Execution
+                    Goal Planner
                   </button>
                 </div>
 
@@ -469,25 +441,20 @@ export const App: React.FC = () => {
               <div className="space-y-6">
                 {/* Grounded Recommended Next Step Card */}
                 {profile.recommended_next_step && (
-                  <div className="bg-white p-5 rounded-3xl border border-[#FED7AA] shadow-xs flex flex-wrap items-center justify-between gap-4 bg-gradient-to-r from-white via-white to-[#FFF7ED]/50 animate-in fade-in duration-200">
-                    <div className="flex items-start gap-3.5 max-w-2xl">
-                      <div className="w-10 h-10 rounded-2xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                  <div className="bg-white p-6 rounded-3xl border border-[#FED7AA] shadow-xs flex flex-wrap items-center justify-between gap-5 bg-gradient-to-r from-white via-white to-[#FFF7ED]/50 animate-in fade-in duration-200">
+                    <div className="flex items-start gap-4 max-w-2xl">
+                      <div className="w-11 h-11 rounded-2xl bg-[#FFF7ED] text-[#EA580C] flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
                         <Sparkles className="w-5 h-5" />
                       </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-[#EA580C] uppercase tracking-wider bg-[#FFF7ED] px-2 py-0.5 rounded-full border border-[#FED7AA]">
-                            Recommended Next Step
-                          </span>
-                          <h3 className="font-heading font-bold text-sm md:text-base text-[#0F3D3E]">
-                            {profile.recommended_next_step.title}
-                          </h3>
-                        </div>
-                        <p className="text-xs text-[#476D6D]">
+                      <div className="space-y-1.5">
+                        <h3 className="font-heading font-bold text-base md:text-lg text-[#0F3D3E]">
+                          {profile.recommended_next_step.title}
+                        </h3>
+                        <p className="text-sm text-[#476D6D]">
                           {profile.recommended_next_step.description}
                         </p>
-                        <p className="text-[11px] text-[#648484] italic">
-                          <strong>Why:</strong> {profile.recommended_next_step.reason}
+                        <p className="text-xs md:text-sm text-[#648484]">
+                          <strong className="text-[#0F3D3E]">Why:</strong> {profile.recommended_next_step.reason}
                         </p>
                       </div>
                     </div>
@@ -495,9 +462,9 @@ export const App: React.FC = () => {
                     <button
                       onClick={() => setActiveTab(profile.recommended_next_step!.target_tab as any)}
                       id="recommended-next-step-btn"
-                      className="flex items-center gap-2 bg-[#EA580C] hover:bg-[#C2410C] text-white px-5 py-2.5 rounded-full text-xs font-semibold transition-all shadow-xs cursor-pointer hover:translate-x-0.5"
+                      className="flex items-center gap-2 bg-[#EA580C] hover:bg-[#C2410C] text-white px-5 py-3 rounded-full text-sm font-semibold transition-all shadow-xs cursor-pointer hover:translate-x-0.5"
                     >
-                      <span>Proceed to {profile.recommended_next_step.target_tab === 'clean' ? 'Clean Studio' : profile.recommended_next_step.target_tab === 'predict' ? 'Predict Studio' : profile.recommended_next_step.target_tab === 'charts' ? 'Analyze' : 'Executive Brief'}</span>
+                      <span>Go to {profile.recommended_next_step.target_tab === 'clean' ? 'Clean Data' : profile.recommended_next_step.target_tab === 'predict' ? 'Predict' : profile.recommended_next_step.target_tab === 'charts' ? 'Explore Data' : 'Reports'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
@@ -512,20 +479,15 @@ export const App: React.FC = () => {
                     onClick={() => setShowTablePreview(!showTablePreview)}
                     className="w-full p-5 flex items-center justify-between text-left hover:bg-[#FAF8F5] transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#F0FDFA] text-[#0D9488] flex items-center justify-center">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#F0FDFA] text-[#0D9488] flex items-center justify-center">
                         <TableIcon className="w-5 h-5" />
                       </div>
-                      <div>
-                        <h3 className="font-heading font-bold text-sm text-[#0F3D3E]">
-                          Explore Data Table ({profile.metadata.rows.toLocaleString()} Records)
-                        </h3>
-                        <p className="text-xs text-[#648484]">
-                          Search, paginate, and inspect raw rows with typed column badges
-                        </p>
-                      </div>
+                      <h3 className="font-heading font-bold text-base text-[#0F3D3E]">
+                        Dataset Preview ({profile.metadata.rows.toLocaleString()} Records)
+                      </h3>
                     </div>
-                    {showTablePreview ? <ChevronUp className="w-4 h-4 text-[#648484]" /> : <ChevronDown className="w-4 h-4 text-[#648484]" />}
+                    {showTablePreview ? <ChevronUp className="w-5 h-5 text-[#648484]" /> : <ChevronDown className="w-5 h-5 text-[#648484]" />}
                   </button>
 
                   {showTablePreview && (
@@ -541,40 +503,35 @@ export const App: React.FC = () => {
                     onClick={() => setShowFeatureDictionary(!showFeatureDictionary)}
                     className="w-full p-5 flex items-center justify-between text-left hover:bg-[#FAF8F5] transition-colors cursor-pointer"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center">
                         <FileText className="w-5 h-5" />
                       </div>
-                      <div>
-                        <h3 className="font-heading font-bold text-sm text-[#0F3D3E]">
-                          Statistical Feature Dictionary ({profile.columns.length} Features)
-                        </h3>
-                        <p className="text-xs text-[#648484]">
-                          Inspect inferred data types, completeness, min, max, mean, and IQR ranges
-                        </p>
-                      </div>
+                      <h3 className="font-heading font-bold text-base text-[#0F3D3E]">
+                        Feature Dictionary ({profile.columns.length} Features)
+                      </h3>
                     </div>
-                    {showFeatureDictionary ? <ChevronUp className="w-4 h-4 text-[#648484]" /> : <ChevronDown className="w-4 h-4 text-[#648484]" />}
+                    {showFeatureDictionary ? <ChevronUp className="w-5 h-5 text-[#648484]" /> : <ChevronDown className="w-5 h-5 text-[#648484]" />}
                   </button>
 
                   {showFeatureDictionary && (
                     <div className="p-5 border-t border-[#F0EDE6] bg-[#FAF8F5] overflow-x-auto">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full text-left text-sm">
                         <thead>
                           <tr className="border-b border-[#EAE6DF] text-[#476D6D]">
-                            <th className="py-2 px-3 font-semibold">Column</th>
-                            <th className="py-2 px-3 font-semibold">Inferred Type</th>
-                            <th className="py-2 px-3 font-semibold">Completeness</th>
-                            <th className="py-2 px-3 font-semibold">Unique Values</th>
-                            <th className="py-2 px-3 font-semibold">Summary Stats</th>
+                            <th className="py-3 px-4 font-semibold">Column</th>
+                            <th className="py-3 px-4 font-semibold">Inferred Type</th>
+                            <th className="py-3 px-4 font-semibold">Completeness</th>
+                            <th className="py-3 px-4 font-semibold">Unique Values</th>
+                            <th className="py-3 px-4 font-semibold">Summary Stats</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[#EAE6DF]">
                           {profile.columns.map((col, idx) => (
                             <tr key={idx} className="hover:bg-white transition-colors">
-                              <td className="py-2.5 px-3 font-semibold text-[#0F3D3E]">{col.column}</td>
-                              <td className="py-2.5 px-3">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              <td className="py-3 px-4 font-semibold text-[#0F3D3E]">{col.column}</td>
+                              <td className="py-3 px-4">
+                                <span className={`text-xs font-semibold px-2.5 py-1 rounded-md ${
                                   col.inferred_type === 'numeric'
                                     ? 'bg-[#EFF6FF] text-[#1D4ED8]'
                                     : col.inferred_type === 'datetime'
@@ -586,13 +543,13 @@ export const App: React.FC = () => {
                                   {col.inferred_type}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3 text-[#476D6D]">
+                              <td className="py-3 px-4 text-[#476D6D]">
                                 {100 - col.null_percentage}% ({col.null_count} nulls)
                               </td>
-                              <td className="py-2.5 px-3 text-[#476D6D]">
+                              <td className="py-3 px-4 text-[#476D6D]">
                                 {col.unique_count.toLocaleString()}
                               </td>
-                              <td className="py-2.5 px-3 text-[#0F3D3E] font-mono text-[11px]">
+                              <td className="py-3 px-4 text-[#0F3D3E] font-mono text-xs">
                                 {col.inferred_type === 'numeric' && col.mean !== undefined
                                   ? `Mean: ${col.mean} | Min: ${col.min} | Max: ${col.max}`
                                   : col.top_categories && col.top_categories.length > 0
@@ -621,8 +578,8 @@ export const App: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[#EAE6DF] bg-white py-4 px-4 md:px-8 text-center text-xs text-[#648484]">
-        <span>DataSense AI V2 • Built with React, FastAPI, Pandas & Plotly • 100% Mathematically Grounded Execution</span>
+      <footer className="border-t border-[#EAE6DF] bg-white py-4 px-4 md:px-8 text-center text-sm text-[#648484]">
+        <span>DataSense AI • 100% Mathematically Grounded Data Science Agent</span>
       </footer>
 
       {/* Modals */}

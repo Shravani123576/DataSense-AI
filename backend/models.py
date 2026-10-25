@@ -252,6 +252,11 @@ class AutoMLResponse(BaseModel):
     metric_explanations: Optional[Dict[str, str]] = None
     validation_strategy: Optional[str] = "Held-out test split (isolated preprocessing)"
     verification_status: Optional[str] = "Model evaluated on unseen holdout test split"
+    permutation_feature_importance: Optional[List[Dict[str, Any]]] = None
+    error_analysis: Optional[Dict[str, Any]] = None
+    multicollinearity_warnings: Optional[List[Dict[str, Any]]] = None
+    baseline_drift_reference: Optional[Dict[str, Any]] = None
+    reproducible_python_script: Optional[str] = None
 
 
 class WhatIfRequest(BaseModel):
@@ -340,3 +345,86 @@ class ExecutiveReportResponse(BaseModel):
     executive_summary: str
     recommendations: List[str]
     limitations: List[str]
+
+
+# ==========================================
+# Statistical Hypothesis Testing Models (V4)
+# ==========================================
+
+class HypothesisTestRequest(BaseModel):
+    dataset_id: str
+    test_type: Optional[str] = "auto"  # 'auto', 'two_sample_t', 'anova', 'chi_square'
+    variable_x: str  # group column or first category
+    variable_y: Optional[str] = None  # metric column or second category
+    confidence_level: Optional[float] = 0.95
+
+
+class AssumptionCheck(BaseModel):
+    name: str  # 'Normality Check', 'Equal Variance (Homoscedasticity)', 'Expected Frequencies'
+    passed: bool
+    details: str
+    metric_value: Optional[float] = None
+    p_value: Optional[float] = None
+
+
+class HypothesisTestResponse(BaseModel):
+    test_name: str
+    test_category: str  # 'parametric', 'non_parametric', 'categorical_independence'
+    null_hypothesis: str
+    alternative_hypothesis: str
+    test_statistic_name: str
+    test_statistic_value: float
+    p_value: float
+    is_statistically_significant: bool
+    significance_threshold: float = 0.05
+    effect_size_name: str
+    effect_size_value: float
+    effect_size_magnitude: str  # 'negligible', 'small', 'medium', 'large'
+    assumptions: List[AssumptionCheck]
+    group_summaries: Dict[str, Dict[str, Any]]
+    plain_english_finding: str
+    practical_implication: str
+    caveat_disclaimer: str = "Statistical significance does not prove real-world importance or causal relationship."
+
+
+# ==========================================
+# Graph Intelligence Agent Models (V4)
+# ==========================================
+
+class GraphIntelligenceAnalyzeRequest(BaseModel):
+    dataset_id: str
+    chart_spec: Dict[str, Any]
+    x_column: str
+    y_column: Optional[str] = None
+    chart_type: str
+    aggregation: Optional[str] = "mean"
+    filters: Optional[Dict[str, Any]] = None
+
+
+class GraphFindingItem(BaseModel):
+    category: str  # 'Observed Fact', 'Statistical Finding', 'Anomaly', 'Data Quality Note'
+    title: str
+    detail: str
+    confidence: Optional[str] = "High"  # 'High', 'Moderate', 'Hypothesis'
+
+
+class GraphIntelligenceResponse(BaseModel):
+    summary: str
+    key_findings: List[GraphFindingItem]
+    anomalies_detected: List[str]
+    group_comparisons: List[str]
+    hidden_patterns: List[str]
+    data_quality_concerns: List[str]
+    suggested_followups: List[str]
+    recommended_alternative_charts: List[str]
+    causation_disclaimer: str = "Patterns and correlations displayed represent observed sample associations and must not be interpreted as causal mechanisms without controlled experimental evidence."
+
+
+class GraphIntelligenceAskRequest(BaseModel):
+    dataset_id: str
+    chart_spec: Dict[str, Any]
+    x_column: str
+    y_column: Optional[str] = None
+    chart_type: str
+    question: str
+    api_key: Optional[str] = None

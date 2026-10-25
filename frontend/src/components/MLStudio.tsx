@@ -97,38 +97,16 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
       <div
         style={{
           background: '#FFFFFF',
-          padding: '24px',
-          borderRadius: '16px',
-          border: '1px solid #E2E8F0',
-          boxShadow: '0 4px 16px rgba(15, 61, 62, 0.04)',
+          padding: '24px 28px',
+          borderRadius: '20px',
+          border: '1px solid #EAE6DF',
+          boxShadow: '0 2px 10px rgba(15, 61, 62, 0.04)',
           marginBottom: '24px',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span
-            style={{
-              fontSize: '12px',
-              fontWeight: 700,
-              color: '#EA580C',
-              textTransform: 'uppercase',
-              letterSpacing: '0.6px',
-              background: '#FFF7ED',
-              padding: '4px 10px',
-              borderRadius: '8px',
-            }}
-          >
-            Automated Machine Learning
-          </span>
-          <span style={{ fontSize: '13px', color: '#64748B' }}>
-            Leakage-Free Validation & Tournament Leaderboard
-          </span>
-        </div>
-        <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#0F3D3E', margin: '8px 0 4px' }}>
-          AutoML & Counterfactual Simulation Studio
+        <h2 style={{ fontSize: '24px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
+          Predict (AutoML)
         </h2>
-        <p style={{ fontSize: '14px', color: '#64748B', margin: '0 0 20px' }}>
-          Compare baseline dummy models against Random Forests, Ridge/Logistic Regression, and Decision Trees with full overfitting detection and what-if simulations.
-        </p>
 
         {/* Configuration Bar */}
         <div
@@ -138,27 +116,28 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             flexWrap: 'wrap',
             gap: '16px',
             background: '#FAF8F5',
-            padding: '16px',
-            borderRadius: '12px',
-            border: '1px solid #E2E8F0',
+            padding: '16px 20px',
+            borderRadius: '14px',
+            border: '1px solid #EAE6DF',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: '#0F3D3E' }}>
-              Target Feature to Predict:
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: '#0F3D3E' }}>
+              Target Feature:
             </label>
             <select
               value={selectedTarget}
               onChange={(e) => setSelectedTarget(e.target.value)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
+                padding: '9px 14px',
+                borderRadius: '10px',
                 border: '1px solid #CBD5E1',
                 background: '#FFFFFF',
-                fontSize: '13px',
+                fontSize: '14px',
                 fontWeight: 600,
                 color: '#0F3D3E',
                 minWidth: '220px',
+                cursor: 'pointer',
               }}
             >
               {columns.map((col) => (
@@ -169,26 +148,27 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             </select>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '12px', fontWeight: 700, color: '#0F3D3E' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label style={{ fontSize: '14px', fontWeight: 600, color: '#0F3D3E' }}>
               Task Mode:
             </label>
             <select
               value={taskType}
               onChange={(e) => setTaskType(e.target.value as any)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
+                padding: '9px 14px',
+                borderRadius: '10px',
                 border: '1px solid #CBD5E1',
                 background: '#FFFFFF',
-                fontSize: '13px',
+                fontSize: '14px',
                 fontWeight: 500,
-                color: '#1E293B',
+                color: '#0F3D3E',
+                cursor: 'pointer',
               }}
             >
               <option value="auto">Auto-Detect</option>
-              <option value="classification">Classification (Discrete / Categories)</option>
-              <option value="regression">Regression (Continuous Numeric)</option>
+              <option value="classification">Classification (Categories)</option>
+              <option value="regression">Regression (Continuous)</option>
             </select>
           </div>
 
@@ -196,13 +176,13 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             onClick={handleTrain}
             disabled={isTraining || !selectedTarget}
             style={{
-              marginTop: '18px',
+              marginTop: '22px',
               background: '#0F3D3E',
               color: '#FFFFFF',
               border: 'none',
-              borderRadius: '10px',
-              padding: '10px 24px',
-              fontSize: '14px',
+              borderRadius: '12px',
+              padding: '11px 26px',
+              fontSize: '15px',
               fontWeight: 700,
               cursor: isTraining ? 'not-allowed' : 'pointer',
               opacity: isTraining ? 0.7 : 1,
@@ -216,8 +196,8 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
               <>
                 <span
                   style={{
-                    width: '14px',
-                    height: '14px',
+                    width: '16px',
+                    height: '16px',
                     border: '2px solid #FFFFFF',
                     borderTopColor: 'transparent',
                     borderRadius: '50%',
@@ -244,10 +224,10 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             background: '#FEF2F2',
             color: '#991B1B',
             border: '1px solid #FECACA',
-            padding: '14px 18px',
-            borderRadius: '10px',
+            padding: '14px 20px',
+            borderRadius: '12px',
             marginBottom: '20px',
-            fontSize: '14px',
+            fontSize: '15px',
           }}
         >
           <strong>AutoML Error:</strong> {errorMsg}
@@ -262,34 +242,34 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             style={{
               background: 'linear-gradient(135deg, #0F3D3E 0%, #155E60 100%)',
               color: '#FFFFFF',
-              borderRadius: '16px',
-              padding: '24px',
+              borderRadius: '20px',
+              padding: '26px 30px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
-              gap: '16px',
+              gap: '20px',
               boxShadow: '0 4px 20px rgba(15, 61, 62, 0.15)',
             }}
           >
             <div>
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: '12px',
                   fontWeight: 800,
                   textTransform: 'uppercase',
-                  letterSpacing: '1px',
+                  letterSpacing: '0.8px',
                   background: '#EA580C',
-                  padding: '4px 10px',
+                  padding: '4px 12px',
                   borderRadius: '20px',
                 }}
               >
-                Tournament Champion
+                Champion Model
               </span>
-              <h3 style={{ fontSize: '24px', fontWeight: 800, margin: '8px 0 4px' }}>
+              <h3 style={{ fontSize: '26px', fontWeight: 800, margin: '10px 0 6px' }}>
                 {mlResult.best_model_name}
               </h3>
-              <p style={{ margin: 0, fontSize: '13px', opacity: 0.85 }}>
+              <p style={{ margin: 0, fontSize: '14px', opacity: 0.9 }}>
                 Target: <strong>{mlResult.target_column}</strong> &bull; Task:{' '}
                 <strong>{mlResult.task_type.toUpperCase()}</strong> &bull; Samples:{' '}
                 {mlResult.total_samples.toLocaleString()} ({mlResult.train_samples} train / {mlResult.test_samples} test)
@@ -297,19 +277,19 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             </div>
 
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '12px 20px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '26px', fontWeight: 800, color: '#FED7AA' }}>
+              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.12)', padding: '14px 24px', borderRadius: '14px' }}>
+                <div style={{ fontSize: '30px', fontWeight: 800, color: '#FED7AA' }}>
                   {mlResult.leaderboard[0].test_score}
                 </div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>
+                <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.85, fontWeight: 600 }}>
                   Holdout Test Score
                 </div>
               </div>
-              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.1)', padding: '12px 20px', borderRadius: '12px' }}>
-                <div style={{ fontSize: '26px', fontWeight: 800 }}>
+              <div style={{ textAlign: 'center', background: 'rgba(255,255,255,0.12)', padding: '14px 24px', borderRadius: '14px' }}>
+                <div style={{ fontSize: '30px', fontWeight: 800 }}>
                   {mlResult.leaderboard[0].train_score}
                 </div>
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', opacity: 0.8 }}>
+                <div style={{ fontSize: '12px', textTransform: 'uppercase', opacity: 0.85, fontWeight: 600 }}>
                   Train Score
                 </div>
               </div>
@@ -320,24 +300,24 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
           <div
             style={{
               background: '#FFFFFF',
-              borderRadius: '16px',
-              padding: '24px',
-              border: '1px solid #E2E8F0',
+              borderRadius: '20px',
+              padding: '26px',
+              border: '1px solid #EAE6DF',
             }}
           >
-            <h4 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
+            <h4 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
               Model Tournament Leaderboard
             </h4>
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ background: '#FAF8F5', borderBottom: '2px solid #E2E8F0' }}>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Rank & Model</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Algorithm</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>Holdout Test Score</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>Train Score</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>Overfitting Gap</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right', color: '#0F3D3E' }}>Duration</th>
+                  <tr style={{ background: '#FAF8F5', borderBottom: '2px solid #EAE6DF' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', color: '#0F3D3E' }}>Rank & Model</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', color: '#0F3D3E' }}>Algorithm</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', color: '#0F3D3E' }}>Holdout Test Score</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', color: '#0F3D3E' }}>Train Score</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', color: '#0F3D3E' }}>Overfitting Gap</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', color: '#0F3D3E' }}>Duration</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -348,21 +328,21 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                       <tr
                         key={m.model_name}
                         style={{
-                          borderBottom: '1px solid #F1F5F9',
+                          borderBottom: '1px solid #F0EDE6',
                           background: isWinner ? '#FFF7ED' : 'transparent',
                         }}
                       >
-                        <td style={{ padding: '12px 14px', fontWeight: 700, color: '#1E293B' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0F3D3E' }}>
                           #{idx + 1} {m.model_name}
                           {m.is_baseline && (
                             <span
                               style={{
                                 marginLeft: '8px',
-                                fontSize: '10px',
+                                fontSize: '11px',
                                 background: '#E2E8F0',
-                                color: '#475569',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
+                                color: '#476D6D',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
                               }}
                             >
                               Baseline
@@ -372,30 +352,30 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                             <span
                               style={{
                                 marginLeft: '8px',
-                                fontSize: '10px',
+                                fontSize: '11px',
                                 background: '#EA580C',
                                 color: '#FFFFFF',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
                               }}
                             >
                               Winner
                             </span>
                           )}
                         </td>
-                        <td style={{ padding: '12px 14px', color: '#64748B' }}>{m.algorithm}</td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center', fontWeight: 700, color: '#0F3D3E' }}>
+                        <td style={{ padding: '14px 16px', color: '#476D6D' }}>{m.algorithm}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 700, color: '#0F3D3E' }}>
                           {m.test_score}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center', color: '#64748B' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', color: '#476D6D' }}>
                           {m.train_score}
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                           <span
                             style={{
-                              fontSize: '11px',
+                              fontSize: '12px',
                               fontWeight: 600,
-                              padding: '2px 8px',
+                              padding: '3px 10px',
                               borderRadius: '6px',
                               background: isOverfit ? '#FEE2E2' : '#ECFDF5',
                               color: isOverfit ? '#B91C1C' : '#047857',
@@ -405,7 +385,7 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                             {isOverfit ? 'High' : 'Low'})
                           </span>
                         </td>
-                        <td style={{ padding: '12px 14px', textAlign: 'right', color: '#64748B' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', color: '#648484' }}>
                           {m.training_time_ms} ms
                         </td>
                       </tr>
@@ -415,23 +395,23 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
               </table>
             </div>
 
-            <div style={{ marginTop: '14px', fontSize: '12px', color: '#64748B' }}>
-              <strong>Generalization Assessment:</strong> {mlResult.overfitting_assessment}
+            <div style={{ marginTop: '16px', fontSize: '14px', color: '#476D6D' }}>
+              <strong className="text-[#0F3D3E]">Generalization Assessment:</strong> {mlResult.overfitting_assessment}
             </div>
 
             {/* Plain-English Metric Explanations Guide */}
             {mlResult.metric_explanations && (
-              <div style={{ background: '#FAF8F5', borderRadius: '12px', padding: '16px 20px', border: '1px solid #E2E8F0', marginTop: '16px' }}>
-                <h5 style={{ fontSize: '13px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 10px' }}>
-                  Plain-English Metric Guide & Held-Out Scores
+              <div style={{ background: '#FAF8F5', borderRadius: '14px', padding: '18px 22px', border: '1px solid #EAE6DF', marginTop: '18px' }}>
+                <h5 style={{ fontSize: '15px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 12px' }}>
+                  Metric Guide & Held-Out Scores
                 </h5>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '12px' }}>
                   {Object.entries(mlResult.metric_explanations).map(([k, desc]) => (
-                    <div key={k} style={{ background: '#FFFFFF', padding: '10px 14px', borderRadius: '8px', border: '1px solid #E2E8F0', fontSize: '12px' }}>
-                      <strong style={{ color: '#EA580C', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: '2px' }}>
+                    <div key={k} style={{ background: '#FFFFFF', padding: '12px 16px', borderRadius: '10px', border: '1px solid #EAE6DF', fontSize: '14px' }}>
+                      <strong style={{ color: '#EA580C', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block', marginBottom: '4px' }}>
                         {k.replace('_', ' ')}: {mlResult.best_model_metrics[k] !== undefined ? mlResult.best_model_metrics[k] : ''}
                       </strong>
-                      <span style={{ color: '#475569' }}>{desc}</span>
+                      <span style={{ color: '#476D6D', lineHeight: 1.5 }}>{desc}</span>
                     </div>
                   ))}
                 </div>
@@ -440,8 +420,8 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
           </div>
 
           {/* Validation & Lineage Notice */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '10px 16px', borderRadius: '12px' }}>
-            <span style={{ fontWeight: 700, background: '#DCFCE7', padding: '2px 8px', borderRadius: '6px' }}>VERIFIED</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '14px', background: '#F0FDF4', color: '#166534', border: '1px solid #BBF7D0', padding: '12px 18px', borderRadius: '14px' }}>
+            <span style={{ fontWeight: 700, background: '#DCFCE7', padding: '3px 10px', borderRadius: '6px' }}>VERIFIED</span>
             <span><strong>Out-of-Sample Holdout:</strong> {mlResult.verification_status} &bull; <em>Strategy: {mlResult.validation_strategy}</em></span>
           </div>
 
@@ -451,28 +431,25 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             <div
               style={{
                 background: '#FFFFFF',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #EAE6DF',
               }}
             >
-              <h4 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
-                Key Predictive Drivers (Feature Importance)
+              <h4 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 16px' }}>
+                Feature Importance
               </h4>
-              <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px' }}>
-                Attributes with the highest relative contribution to the winning model's decisions:
-              </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {mlResult.feature_importance.map((f, i) => (
                   <div key={f.feature}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                      <span style={{ fontWeight: 600, color: '#1E293B' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: 600, color: '#0F3D3E' }}>
                         #{i + 1} {f.feature}
                       </span>
                       <span style={{ fontWeight: 700, color: '#EA580C' }}>{f.percentage}%</span>
                     </div>
-                    <div style={{ height: '8px', background: '#F1F5F9', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '8px', background: '#FAF8F5', borderRadius: '4px', overflow: 'hidden', border: '1px solid #EAE6DF' }}>
                       <div
                         style={{
                           height: '100%',
@@ -491,36 +468,34 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             <div
               style={{
                 background: '#FFFFFF',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #EAE6DF',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h4 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
-                  What-If Counterfactual Simulator
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <h4 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
+                  Scenario Simulator
                 </h4>
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     color: '#EA580C',
                     background: '#FFF7ED',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
+                    padding: '3px 10px',
+                    borderRadius: '8px',
+                    border: '1px solid #FED7AA',
                   }}
                 >
                   Interactive
                 </span>
               </div>
-              <p style={{ fontSize: '13px', color: '#64748B', margin: '0 0 16px' }}>
-                Adjust feature inputs to simulate predicted outcomes against typical baseline conditions:
-              </p>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '18px' }}>
                 {Object.keys(whatIfInputs).map((feat) => (
                   <div key={feat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                    <label style={{ fontSize: '12px', fontWeight: 600, color: '#475569', minWidth: '130px' }}>
+                    <label style={{ fontSize: '14px', fontWeight: 600, color: '#0F3D3E', minWidth: '130px' }}>
                       {feat}:
                     </label>
                     <input
@@ -528,12 +503,13 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                       value={whatIfInputs[feat] ?? ''}
                       onChange={(e) => handleInputChange(feat, e.target.value)}
                       style={{
-                        padding: '6px 10px',
-                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
                         border: '1px solid #CBD5E1',
-                        fontSize: '13px',
+                        fontSize: '14px',
+                        color: '#0F3D3E',
                         width: '100%',
-                        maxWidth: '160px',
+                        maxWidth: '180px',
                       }}
                     />
                   </div>
@@ -548,13 +524,14 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                   background: '#EA580C',
                   color: '#FFFFFF',
                   border: 'none',
-                  borderRadius: '10px',
-                  padding: '10px',
-                  fontSize: '13px',
+                  borderRadius: '12px',
+                  padding: '12px',
+                  fontSize: '15px',
                   fontWeight: 700,
                   cursor: isSimulating ? 'not-allowed' : 'pointer',
                   opacity: isSimulating ? 0.7 : 1,
                   marginBottom: '16px',
+                  boxShadow: '0 2px 8px rgba(234, 88, 12, 0.25)',
                 }}
               >
                 {isSimulating ? 'Simulating Prediction...' : 'Simulate Scenario Outcome'}
@@ -565,22 +542,22 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                 <div
                   style={{
                     background: '#FAF8F5',
-                    padding: '16px',
-                    borderRadius: '12px',
-                    border: '1px solid #E2E8F0',
+                    padding: '18px',
+                    borderRadius: '14px',
+                    border: '1px solid #EAE6DF',
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 600, color: '#648484' }}>
                       Predicted Result:
                     </span>
-                    <span style={{ fontSize: '16px', fontWeight: 800, color: '#0F3D3E' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 800, color: '#0F3D3E' }}>
                       {String(whatIfResult.prediction)}
                     </span>
                   </div>
 
                   {whatIfResult.prediction_delta !== undefined && whatIfResult.prediction_delta !== null && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748B', marginBottom: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#648484', marginBottom: '8px' }}>
                       <span>Delta vs Baseline ({whatIfResult.baseline_prediction}):</span>
                       <strong style={{ color: whatIfResult.prediction_delta >= 0 ? '#059669' : '#DC2626' }}>
                         {whatIfResult.prediction_delta > 0 ? `+${whatIfResult.prediction_delta}` : whatIfResult.prediction_delta}
@@ -588,7 +565,7 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                     </div>
                   )}
 
-                  <p style={{ fontSize: '12px', color: '#334155', margin: '8px 0', lineHeight: 1.5 }}>
+                  <p style={{ fontSize: '14px', color: '#476D6D', margin: '8px 0', lineHeight: 1.5 }}>
                     {whatIfResult.explanation}
                   </p>
 
@@ -597,11 +574,10 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                       background: '#FFFBEB',
                       border: '1px solid #FDE68A',
                       color: '#92400E',
-                      padding: '8px 10px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontStyle: 'italic',
-                      marginTop: '8px',
+                      padding: '10px 14px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      marginTop: '10px',
                     }}
                   >
                     {whatIfResult.disclaimer}
@@ -616,28 +592,23 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             <div
               style={{
                 background: '#FFFFFF',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #EAE6DF',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h4 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 4px' }}>
-                    Holdout Test Evaluation Visualizer
-                  </h4>
-                  <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-                    Direct evaluation of the champion model ({mlResult.best_model_name}) on {mlResult.test_samples} unseen test observations:
-                  </p>
-                </div>
+                <h4 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
+                  Holdout Test Evaluation
+                </h4>
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     color: '#6D28D9',
                     background: '#F5F3FF',
                     border: '1px solid #DDD6FE',
-                    padding: '4px 10px',
+                    padding: '4px 12px',
                     borderRadius: '8px',
                   }}
                 >
@@ -665,28 +636,23 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
             <div
               style={{
                 background: '#FFFFFF',
-                borderRadius: '16px',
+                borderRadius: '20px',
                 padding: '24px',
-                border: '1px solid #E2E8F0',
+                border: '1px solid #EAE6DF',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <div>
-                  <h4 style={{ fontSize: '17px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 4px' }}>
-                    Held-Out Test Set Predictions (First {mlResult.held_out_predictions.length} Samples)
-                  </h4>
-                  <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-                    Comparing ground-truth values against model predictions on held-out test data:
-                  </p>
-                </div>
+                <h4 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
+                  Held-Out Predictions
+                </h4>
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     fontWeight: 700,
                     color: '#0D9488',
                     background: '#F0FDFA',
                     border: '1px solid #CCECE6',
-                    padding: '4px 10px',
+                    padding: '4px 12px',
                     borderRadius: '8px',
                   }}
                 >
@@ -695,39 +661,39 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
               </div>
 
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
                   <thead>
-                    <tr style={{ background: '#FAF8F5', borderBottom: '2px solid #E2E8F0' }}>
-                      <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Row #</th>
-                      <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Actual Ground Truth</th>
-                      <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Model Prediction</th>
-                      <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>
+                    <tr style={{ background: '#FAF8F5', borderBottom: '2px solid #EAE6DF' }}>
+                      <th style={{ padding: '12px 14px', textAlign: 'left', color: '#0F3D3E' }}>Row #</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'left', color: '#0F3D3E' }}>Actual Ground Truth</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'left', color: '#0F3D3E' }}>Model Prediction</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'center', color: '#0F3D3E' }}>
                         {mlResult.task_type === 'classification' ? 'Outcome' : 'Residual (Error)'}
                       </th>
-                      <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Sample Features</th>
+                      <th style={{ padding: '12px 14px', textAlign: 'left', color: '#0F3D3E' }}>Sample Features</th>
                     </tr>
                   </thead>
                   <tbody>
                     {mlResult.held_out_predictions.map((p) => {
                       const isCorrect = p.is_correct;
                       return (
-                        <tr key={p.row_index} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                          <td style={{ padding: '10px 14px', fontWeight: 600, color: '#64748B' }}>
+                        <tr key={p.row_index} style={{ borderBottom: '1px solid #F0EDE6' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 600, color: '#648484' }}>
                             #{p.row_index}
                           </td>
-                          <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0F3D3E' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#0F3D3E' }}>
                             {String(p.actual)}
                           </td>
-                          <td style={{ padding: '10px 14px', fontWeight: 700, color: '#EA580C' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: 700, color: '#EA580C' }}>
                             {String(p.predicted)}
                           </td>
-                          <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                             {mlResult.task_type === 'classification' ? (
                               <span
                                 style={{
-                                  fontSize: '11px',
+                                  fontSize: '12px',
                                   fontWeight: 700,
-                                  padding: '2px 8px',
+                                  padding: '3px 10px',
                                   borderRadius: '6px',
                                   background: isCorrect ? '#ECFDF5' : '#FEF2F2',
                                   color: isCorrect ? '#047857' : '#B91C1C',
@@ -739,8 +705,9 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                             ) : (
                               <span
                                 style={{
-                                  fontSize: '12px',
+                                  fontSize: '13px',
                                   fontFamily: 'monospace',
+                                  fontWeight: 600,
                                   color: p.error_or_residual && p.error_or_residual > 0 ? '#B91C1C' : '#047857',
                                 }}
                               >
@@ -750,7 +717,7 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '10px 14px', fontSize: '11px', color: '#64748B' }}>
+                          <td style={{ padding: '12px 14px', fontSize: '13px', color: '#648484' }}>
                             {Object.entries(p.features)
                               .slice(0, 3)
                               .map(([k, v]) => `${k}: ${v}`)
@@ -771,14 +738,14 @@ export const MLStudio: React.FC<MLStudioProps> = ({ dataset }) => {
               style={{
                 background: '#FAF8F5',
                 borderRadius: '16px',
-                padding: '20px 24px',
+                padding: '22px 26px',
                 border: '1px solid #EAE6DF',
               }}
             >
-              <h5 style={{ fontSize: '14px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 10px' }}>
+              <h5 style={{ fontSize: '16px', fontWeight: 700, color: '#0F3D3E', margin: '0 0 10px' }}>
                 Model Limitations & Scientific Caveats
               </h5>
-              <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '12px', color: '#476D6D', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <ul style={{ margin: 0, paddingLeft: '22px', fontSize: '14px', color: '#476D6D', display: 'flex', flexDirection: 'column', gap: '8px', lineHeight: 1.6 }}>
                 {mlResult.limitations.map((lim, idx) => (
                   <li key={idx}>{lim}</li>
                 ))}

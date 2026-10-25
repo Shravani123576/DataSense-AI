@@ -62,36 +62,26 @@ export const Header: React.FC<Props> = ({
         <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#EA580C] to-[#C2410C] flex items-center justify-center text-white shadow-xs">
           <Sparkles className="w-5 h-5 fill-current/20" />
         </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-heading font-bold text-xl text-[#0F3D3E] tracking-tight">
-              DataSense <span className="text-[#EA580C]">AI</span>
-            </span>
-            <span className="hidden sm:inline-flex text-[11px] font-semibold bg-[#FFF7ED] text-[#EA580C] px-2 py-0.5 rounded-full border border-[#FED7AA]">
-              Beginner Studio
-            </span>
-          </div>
-          <p className="text-xs text-[#648484] hidden md:block">
-            Intelligent Data Science Agent with Grounded Calculations
-          </p>
-        </div>
+        <span className="font-heading font-extrabold text-2xl text-[#0F3D3E] tracking-tight">
+          DataSense <span className="text-[#EA580C]">AI</span>
+        </span>
       </div>
 
       {/* Center / Right Action Controls */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-3">
         {/* Sample Datasets Selector */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             disabled={isLoading}
             id="sample-dataset-dropdown-btn"
-            className="flex items-center gap-2 bg-white hover:bg-[#F5F2EB] text-[#0F3D3E] px-3.5 py-2 rounded-full border border-[#EAE6DF] text-xs md:text-sm font-medium transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2.5 bg-white hover:bg-[#F5F2EB] text-[#0F3D3E] px-4 py-2 rounded-full border border-[#EAE6DF] text-sm md:text-base font-semibold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
           >
             <Database className="w-4 h-4 text-[#EA580C]" />
-            <span className="max-w-[130px] md:max-w-[210px] truncate text-left">
+            <span className="max-w-[150px] md:max-w-[240px] truncate text-left">
               {profile ? profile.metadata.name : 'Select Dataset'}
             </span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#648484]" />
+            <ChevronDown className="w-4 h-4 text-[#648484]" />
           </button>
 
           {dropdownOpen && (
@@ -154,10 +144,10 @@ export const Header: React.FC<Props> = ({
         {/* Upload Custom Dataset */}
         <button
           onClick={onOpenUpload}
-          className="flex items-center gap-1.5 bg-[#EA580C] hover:bg-[#C2410C] text-white px-3.5 py-2 rounded-full text-xs md:text-sm font-medium transition-all shadow-xs cursor-pointer"
+          className="flex items-center gap-2 bg-[#EA580C] hover:bg-[#C2410C] text-white px-4 py-2 rounded-full text-sm md:text-base font-semibold transition-all shadow-xs cursor-pointer"
         >
           <Upload className="w-4 h-4" />
-          <span className="hidden sm:inline">Upload File</span>
+          <span className="hidden sm:inline">Upload</span>
         </button>
 
         {/* Export Dropdown */}
@@ -165,11 +155,11 @@ export const Header: React.FC<Props> = ({
           <button
             onClick={() => setExportOpen(!exportOpen)}
             disabled={!profile}
-            className="flex items-center gap-1.5 bg-white hover:bg-[#F5F2EB] text-[#0F3D3E] px-3.5 py-2 rounded-full border border-[#EAE6DF] text-xs md:text-sm font-medium transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 bg-white hover:bg-[#F5F2EB] text-[#0F3D3E] px-4 py-2 rounded-full border border-[#EAE6DF] text-sm md:text-base font-semibold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
           >
             <Download className="w-4 h-4 text-[#476D6D]" />
             <span className="hidden md:inline">Export</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#648484]" />
+            <ChevronDown className="w-4 h-4 text-[#648484]" />
           </button>
 
           {exportOpen && datasetId && (
