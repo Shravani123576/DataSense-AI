@@ -517,11 +517,82 @@ SAMPLE_REGISTRY = {
         "generator": generate_housing_data,
         "sample_questions": [
             "What is the correlation between square feet and property price?",
-            "Which neighborhood has the highest median house price?",
-            "How does having a pool impact the average home price?",
             "What is the distribution of days on market?",
             "Show me the top 5 most expensive properties"
         ]
     }
+}
+
+
+def generate_diabetes_research_data() -> pd.DataFrame:
+    """Generate realistic clinical healthcare research dataset for diagnostic and biomarker analysis."""
+    random.seed(555)
+    np.random.seed(555)
+    n = 160
+    records = []
+    for i in range(1, n + 1):
+        age = random.randint(21, 72)
+        pregnancies = random.choices([0, 1, 2, 3, 4, 6, 8], weights=[0.25, 0.20, 0.20, 0.15, 0.10, 0.06, 0.04])[0]
+        bmi = round(random.gauss(31.5, 6.2), 1)
+        bmi = max(18.2, min(48.5, bmi))
+        pedigree = round(random.uniform(0.08, 1.85), 3)
+        
+        # Clinical risk factors driving glucose
+        is_high_risk = (bmi > 30.0 and age > 35) or (pedigree > 0.8)
+        if is_high_risk:
+            glucose = round(random.gauss(142, 28), 1)
+            insulin = round(random.gauss(165, 55), 1)
+            bp = round(random.gauss(82, 12), 1)
+            prob_diabetic = 0.68
+        else:
+            glucose = round(random.gauss(108, 18), 1)
+            insulin = round(random.gauss(95, 35), 1)
+            bp = round(random.gauss(72, 10), 1)
+            prob_diabetic = 0.18
+
+        glucose = max(65.0, min(198.0, glucose))
+        insulin = max(15.0, min(340.0, insulin))
+        bp = max(50.0, min(115.0, bp))
+        skin = round(random.uniform(12.0, 45.0), 1)
+        outcome = 1 if random.random() < prob_diabetic else 0
+
+        # Intentional missing values in a few records for data quality checks
+        if i in [14, 48, 102]:
+            insulin = np.nan
+        if i in [29, 87]:
+            skin = np.nan
+
+        records.append({
+            "PatientID": f"PT-{3000 + i}",
+            "Age": age,
+            "Pregnancies": pregnancies,
+            "Glucose": glucose,
+            "BloodPressure": bp,
+            "SkinThickness": skin,
+            "Insulin": insulin,
+            "BMI": bmi,
+            "DiabetesPedigree": pedigree,
+            "Outcome": outcome
+        })
+
+    df = pd.DataFrame(records)
+    # Add 1 duplicate row
+    df = pd.concat([df, df.iloc[[18]]], ignore_index=True)
+    return df
+
+
+SAMPLE_REGISTRY["diabetes_research"] = {
+    "name": "Clinical Diabetes Research & Biomarkers",
+    "description": "Healthcare patient cohort tracking glucose, BMI, insulin, age, blood pressure, and diagnostic outcomes.",
+    "category": "Healthcare & Life Sciences",
+    "tags": ["Healthcare", "Biomarkers", "Glucose", "BMI", "Classification"],
+    "generator": generate_diabetes_research_data,
+    "sample_questions": [
+        "What is the average Glucose level for diabetic vs non-diabetic patients?",
+        "What is the correlation between BMI and Glucose?",
+        "How does patient age influence diabetes outcome?",
+        "Are there missing values in Insulin or SkinThickness?",
+        "What is the overall diagnostic positive rate?"
+    ]
 }
 

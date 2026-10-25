@@ -201,6 +201,7 @@ class AutoMLRequest(BaseModel):
     task_type: Optional[str] = 'auto'  # 'auto', 'classification', 'regression'
     test_size: Optional[float] = 0.2
     metric: Optional[str] = 'auto'
+    time_column: Optional[str] = None  # Chronological holdout validation column
 
 
 class ModelLeaderboardItem(BaseModel):

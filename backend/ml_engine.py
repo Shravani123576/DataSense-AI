@@ -174,36 +174,88 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
             raise ValueError(f"Target column '{target_col}' has {len(class_labels)} unique classes. Classification is limited to <= 20 distinct classes.")
         y = y_str
 
+    # Multicollinearity Check
+    multicollinearity_warnings = []
+    num_features = [c for c in candidate_features if pd.api.types.is_numeric_dtype(valid_df[c])]
+    if len(num_features) >= 2:
+        try:
+            corr_matrix = valid_df[num_features].corr().abs()
+            for i in range(len(num_features)):
+                for j in range(i + 1, len(num_features)):
+                    c1, c2 = num_features[i], num_features[j]
+                    val = float(corr_matrix.loc[c1, c2])
+                    if not np.isnan(val) and val >= 0.85:
+                        multicollinearity_warnings.append({
+                            "feature_1": c1,
+                            "feature_2": c2,
+                            "correlation": round(val, 3),
+                            "severity": "high" if val >= 0.95 else "medium",
+                            "recommendation": f"Features '{c1}' and '{c2}' exhibit high correlation (|r| = {val:.2f}). Consider dropping one to stabilize model coefficients and prevent collinearity distortion."
+                        })
+        except Exception as e:
+            logger.warning(f"Could not compute correlation matrix: {e}")
+
     # Train / Test Split
     test_size = float(req.test_size or 0.2)
     test_size = max(0.1, min(0.4, test_size))
     
-    stratify_arg = None
-    if task_type == "classification":
-        min_class_count = min(class_distribution.values()) if class_distribution else 0
-        if min_class_count >= 2:
-            stratify_arg = y
+    # Check for time column for chronological holdout split
+    time_col = req.time_column if (req.time_column and req.time_column in valid_df.columns) else None
+    if not time_col:
+        for c in valid_df.columns:
+            if c != target_col and (pd.api.types.is_datetime64_any_dtype(valid_df[c]) or (c.lower() in ["orderdate", "date", "timestamp", "datetime"] and pd.to_datetime(valid_df[c], errors="coerce").notna().mean() > 0.8)):
+                time_col = c
+                break
 
-    try:
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=stratify_arg
-        )
-    except ValueError as split_err:
-        logger.warning(f"Stratified split failed ({split_err}); falling back to unstratified split.")
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=42, stratify=None
-        )
+    val_strategy = f"{int((1-test_size)*100)}/{int(test_size*100)} train/test holdout split with isolated preprocessing pipeline (leakage-safe)"
+    if time_col:
+        try:
+            time_series_parsed = pd.to_datetime(valid_df[time_col], errors="coerce")
+            sorted_idx = time_series_parsed.sort_values().index
+            X_sorted = X.loc[sorted_idx]
+            y_sorted = y.loc[sorted_idx]
+            split_point = int(len(valid_df) * (1.0 - test_size))
+            X_train, X_test = X_sorted.iloc[:split_point], X_sorted.iloc[split_point:]
+            y_train, y_test = y_sorted.iloc[:split_point], y_sorted.iloc[split_point:]
+            val_strategy = f"Chronological time-series holdout split on '{time_col}' ({int((1-test_size)*100)}% train / {int(test_size*100)}% test, un-shuffled) preventing lookahead leakage"
+        except Exception:
+            time_col = None
+
+    if not time_col:
+        stratify_arg = None
+        if task_type == "classification":
+            min_class_count = min(class_distribution.values()) if class_distribution else 0
+            if min_class_count >= 2:
+                stratify_arg = y
+
+        try:
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, random_state=42, stratify=stratify_arg
+            )
+        except ValueError as split_err:
+            logger.warning(f"Stratified split failed ({split_err}); falling back to unstratified split.")
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, random_state=42, stratify=None
+            )
 
     preprocessor, num_cols, cat_cols = build_preprocessor(valid_df, candidate_features)
+
+    # Detect class imbalance for weighted loss
+    is_imbalanced = False
+    if task_type == "classification" and class_distribution:
+        counts = list(class_distribution.values())
+        if len(counts) >= 2 and (max(counts) / (min(counts) or 1)) >= 2.5:
+            is_imbalanced = True
 
     # Define model candidates
     candidates = []
     if task_type == "classification":
+        clf_weight = "balanced" if is_imbalanced else None
         candidates = [
             ("Baseline Dummy", "Most Frequent Class", True, DummyClassifier(strategy="most_frequent")),
-            ("Logistic Regression", "L2 Regularized Linear Classifier", False, LogisticRegression(max_iter=1000, random_state=42)),
-            ("Decision Tree", "CART Tree Classifier", False, DecisionTreeClassifier(max_depth=6, random_state=42)),
-            ("Random Forest", "Ensemble Bagging Trees", False, RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)),
+            ("Logistic Regression", "L2 Regularized Linear Classifier" + (" (Class Balanced)" if is_imbalanced else ""), False, LogisticRegression(max_iter=1000, random_state=42, class_weight=clf_weight)),
+            ("Decision Tree", "CART Tree Classifier", False, DecisionTreeClassifier(max_depth=6, random_state=42, class_weight=clf_weight)),
+            ("Random Forest", "Ensemble Bagging Trees" + (" (Class Balanced)" if is_imbalanced else ""), False, RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, class_weight=clf_weight)),
         ]
     else:
         candidates = [
@@ -543,7 +595,111 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
             "rmse": f"Root Mean Squared Error; average prediction error with higher penalty for large errors in '{target_col}'.",
         }
 
-    val_strategy = "80/20 train/test holdout split with isolated preprocessing pipeline (leakage-safe)"
+    # Error Analysis on Holdout Predictions
+    error_analysis: Dict[str, Any] = {}
+    if task_type == "regression":
+        residuals = np.abs(np.array(best_test_pred) - np.array(y_test))
+        worst_order = np.argsort(residuals)[-5:][::-1]
+        worst_samples = []
+        for w_pos in worst_order:
+            worst_samples.append({
+                "row_index": int(X_test.index[w_pos]),
+                "actual": round(float(y_test.iloc[w_pos]), 3),
+                "predicted": round(float(best_test_pred[w_pos]), 3),
+                "residual": round(float(residuals[w_pos]), 3)
+            })
+        bias_val = round(float(np.mean(np.array(best_test_pred) - np.array(y_test))), 3)
+        error_analysis = {
+            "mean_absolute_error": round(float(mean_absolute_error(y_test, best_test_pred)), 3),
+            "max_residual": round(float(np.max(residuals)), 3),
+            "prediction_bias": bias_val,
+            "bias_interpretation": "Slight average overestimation" if bias_val > 0 else "Slight average underestimation",
+            "top_worst_predictions": worst_samples
+        }
+    else:
+        misclass_mask = np.array(best_test_pred) != np.array(y_test)
+        misclass_count = int(np.sum(misclass_mask))
+        worst_samples = []
+        if misclass_count > 0:
+            misclass_pos = np.where(misclass_mask)[0][:5]
+            for m_pos in misclass_pos:
+                worst_samples.append({
+                    "row_index": int(X_test.index[m_pos]),
+                    "actual": str(y_test.iloc[m_pos]),
+                    "predicted": str(best_test_pred[m_pos])
+                })
+        error_analysis = {
+            "misclassified_count": misclass_count,
+            "misclassified_percentage": round((misclass_count / len(y_test)) * 100, 2),
+            "top_misclassifications": worst_samples
+        }
+
+    # Baseline Drift Reference Metrics on Training Set
+    baseline_drift_reference: Dict[str, Any] = {}
+    for c in candidate_features:
+        s = X_train[c].dropna()
+        if pd.api.types.is_numeric_dtype(s) and len(s) > 0:
+            baseline_drift_reference[c] = {
+                "type": "numeric",
+                "mean": round(float(s.mean()), 3),
+                "std": round(float(s.std()), 3),
+                "median": round(float(s.median()), 3),
+                "iqr": round(float(s.quantile(0.75) - s.quantile(0.25)), 3),
+                "min": round(float(s.min()), 3),
+                "max": round(float(s.max()), 3)
+            }
+        elif len(s) > 0:
+            baseline_drift_reference[c] = {
+                "type": "categorical",
+                "top_categories": s.astype(str).value_counts(normalize=True).head(5).round(3).to_dict()
+            }
+
+    # Standalone Reproducible Python Script
+    num_cols_repr = [c for c in candidate_features if pd.api.types.is_numeric_dtype(valid_df[c])]
+    cat_cols_repr = [c for c in candidate_features if not pd.api.types.is_numeric_dtype(valid_df[c])]
+    metric_import = 'accuracy_score, classification_report' if task_type == 'classification' else 'r2_score, mean_squared_error, mean_absolute_error'
+    model_init = 'RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42)' if task_type == 'classification' else 'RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42)'
+    eval_call = 'classification_report(y_test, pipeline.predict(X_test))' if task_type == 'classification' else '{"R2": r2_score(y_test, pipeline.predict(X_test)), "RMSE": np.sqrt(mean_squared_error(y_test, pipeline.predict(X_test)))}'
+
+    reproducible_python_script = f'''# Standalone Reproducible Machine Learning Pipeline
+# Generated by DataSense AI
+# Target: {target_col} | Task: {task_type} | Winning Architecture: {best_name}
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.metrics import {metric_import}
+
+# 1. Feature Specifications
+numeric_cols = {num_cols_repr}
+categorical_cols = {cat_cols_repr}
+
+# 2. Leakage-Safe Preprocessing Pipeline
+preprocessor = ColumnTransformer(transformers=[
+    ("num", Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())]), numeric_cols),
+    ("cat", Pipeline([("imputer", SimpleImputer(strategy="most_frequent")), ("onehot", OneHotEncoder(handle_unknown="ignore", sparse_output=False))]), categorical_cols),
+], remainder="drop")
+
+# 3. Model Pipeline
+pipeline = Pipeline([
+    ("preprocessor", preprocessor),
+    ("estimator", {model_init})
+])
+
+# 4. Fit & Evaluate (Replace with your actual dataset filepath)
+# df = pd.read_csv("dataset.csv")
+# X = df[numeric_cols + categorical_cols]
+# y = df["{target_col}"]
+# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size={test_size}, random_state=42)
+# pipeline.fit(X_train, y_train)
+# print("Test Holdout Results:", {eval_call})
+'''
+
     verif_status = "Model verified: Out-of-sample held-out evaluation completed with isolated feature transformers"
 
     return AutoMLResponse(
@@ -567,7 +723,11 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
         evaluation_chart_spec=eval_chart_spec,
         metric_explanations=metric_explanations,
         validation_strategy=val_strategy,
-        verification_status=verif_status
+        verification_status=verif_status,
+        error_analysis=error_analysis,
+        multicollinearity_warnings=multicollinearity_warnings,
+        baseline_drift_reference=baseline_drift_reference,
+        reproducible_python_script=reproducible_python_script
     )
 
 

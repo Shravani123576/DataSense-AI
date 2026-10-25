@@ -685,4 +685,142 @@ def test_automl_plain_english_metric_explanations():
     assert "holdout" in data["validation_strategy"].lower()
 
 
+# =====================================================================
+# V5 Product Reliability, Scientific Integrity & Workflows Tests
+# =====================================================================
+
+def test_constant_column_detection_and_drop():
+    """Verify that constant/zero-variance columns are flagged in recommendations and cleanly dropped."""
+    # Build dataset with a constant column
+    csv_str = "ID,Value,ConstantCol,Target\n" + "\n".join([f"{i},{i*1.5},SAME_VAL,{i%2}" for i in range(25)])
+    files = {"file": ("constant_test.csv", csv_str.encode("utf-8"), "text/csv")}
+    res = client.post("/api/upload", files=files)
+    assert res.status_code == 200
+    d_id = res.json()["metadata"]["id"]
+
+    # Recommendations should include dropping ConstantCol
+    recs_res = client.get(f"/api/clean/{d_id}/recommendations")
+    assert recs_res.status_code == 200
+    const_recs = [r for r in recs_res.json() if r["column"] == "ConstantCol"]
+    assert len(const_recs) == 1
+    assert const_recs[0]["rule"] == "drop_constant_column"
+
+    # Preview drop
+    prev_res = client.post("/api/clean/preview", json={
+        "dataset_id": d_id,
+        "rule": "drop_constant_column",
+        "column": "ConstantCol"
+    })
+    assert prev_res.status_code == 200
+    assert "drop" in prev_res.json()["summary"].lower()
+
+    # Apply drop
+    apply_res = client.post("/api/clean/apply", json={
+        "dataset_id": d_id,
+        "rule": "drop_constant_column",
+        "column": "ConstantCol"
+    })
+    assert apply_res.status_code == 200
+    # Audit history should record dropping
+    audits = apply_res.json()["audit_history"]
+    assert any(a["rule"] == "drop_constant_column" for a in audits)
+
+
+def test_chronological_time_series_holdout_split():
+    """Verify chronological split validation on datasets with datetime/time columns."""
+    res = client.post("/api/samples/load?sample_id=ecommerce_sales")
+    assert res.status_code == 200
+    d_id = "sample_ecommerce_sales"
+
+    # Train AutoML with OrderDate as chronological time column
+    ml_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Sales",
+        "task_type": "regression",
+        "time_column": "OrderDate"
+    })
+    assert ml_res.status_code == 200
+    data = ml_res.json()
+    assert "chronological" in data["validation_strategy"].lower()
+    assert "OrderDate" in data["validation_strategy"]
+    assert "lookahead" in data["validation_strategy"].lower()
+
+
+def test_multicollinearity_and_error_analysis():
+    """Verify multicollinearity detection, holdout error analysis, and reproducible Python script generation."""
+    # Build dataset with 2 collinear features: X2 = 2 * X1 + noise
+    rows = []
+    for i in range(40):
+        x1 = float(i)
+        x2 = float(2.0 * i + (0.01 if i % 2 == 0 else -0.01))  # Correlation > 0.99
+        y = float(3.0 * x1 + 5.0)
+        rows.append(f"{x1},{x2},{y}")
+    csv_str = "FeatureA,FeatureB,Target\n" + "\n".join(rows)
+
+    files = {"file": ("collinear.csv", csv_str.encode("utf-8"), "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    assert upload_res.status_code == 200
+    d_id = upload_res.json()["metadata"]["id"]
+
+    ml_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Target",
+        "task_type": "regression"
+    })
+    assert ml_res.status_code == 200
+    data = ml_res.json()
+
+    # 1. Multicollinearity warnings
+    assert "multicollinearity_warnings" in data
+    warnings = data["multicollinearity_warnings"]
+    assert len(warnings) >= 1
+    assert warnings[0]["correlation"] >= 0.85
+    assert "FeatureA" in [warnings[0]["feature_1"], warnings[0]["feature_2"]]
+
+    # 2. Error analysis
+    assert "error_analysis" in data
+    err_ana = data["error_analysis"]
+    assert "mean_absolute_error" in err_ana
+    assert "max_residual" in err_ana
+    assert "top_worst_predictions" in err_ana
+    assert len(err_ana["top_worst_predictions"]) > 0
+
+    # 3. Baseline drift reference
+    assert "baseline_drift_reference" in data
+    drift = data["baseline_drift_reference"]
+    assert "FeatureA" in drift
+    assert "mean" in drift["FeatureA"]
+    assert "std" in drift["FeatureA"]
+
+    # 4. Standalone reproducible Python script
+    assert "reproducible_python_script" in data
+    script = data["reproducible_python_script"]
+    assert "import pandas as pd" in script
+    assert "ColumnTransformer" in script
+    assert "Pipeline" in script
+    assert "Target" in script
+
+
+def test_healthcare_diabetes_research_dataset():
+    """Verify multi-domain support with the newly registered clinical healthcare research dataset."""
+    res = client.post("/api/samples/load?sample_id=diabetes_research")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["metadata"]["rows"] >= 150
+    cols = [c["column"] for c in data["columns"]]
+    assert "Glucose" in cols
+    assert "BMI" in cols
+    assert "Outcome" in cols
+
+    # Query healthcare metric
+    q_res = client.post("/api/query", json={
+        "dataset_id": "sample_diabetes_research",
+        "question": "What is the average Glucose level?"
+    })
+    assert q_res.status_code == 200
+    assert "glucose" in q_res.json()["answer_text"].lower()
+    assert "average" in q_res.json()["answer_text"].lower()
+
+
+
 

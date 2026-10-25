@@ -145,11 +145,15 @@ async def upload_dataset(file: UploadFile = File(...)):
     if len(content) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes).")
 
+    # Security & Resource limit: 50 MB max
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds 50 MB limit.")
+
     try:
         if filename.endswith(".csv") or filename.endswith(".txt"):
             try:
-                df = pd.read_csv(io.BytesIO(content))
-            except UnicodeDecodeError:
+                df = pd.read_csv(io.BytesIO(content), encoding="utf-8-sig")
+            except (UnicodeDecodeError, LookupError):
                 df = pd.read_csv(io.BytesIO(content), encoding="latin-1")
         elif filename.endswith((".xlsx", ".xls")):
             df = pd.read_excel(io.BytesIO(content))
@@ -158,12 +162,31 @@ async def upload_dataset(file: UploadFile = File(...)):
                 status_code=400,
                 detail="Unsupported file format. Please upload a CSV (.csv) or Excel (.xlsx, .xls) file."
             )
+    except pd.errors.EmptyDataError:
+        raise HTTPException(status_code=400, detail="Uploaded file contains no data rows or columns.")
+    except pd.errors.ParserError as pe:
+        raise HTTPException(status_code=400, detail=f"Malformed CSV: Failed to parse rows due to inconsistent columns: {str(pe)}")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception(f"Error parsing uploaded file: {e}")
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
 
     if len(df) == 0:
         raise HTTPException(status_code=400, detail="Dataset contains no data rows (empty table).")
+
+    # Sanitize and deduplicate column names
+    clean_cols = []
+    col_counts: Dict[str, int] = {}
+    for idx, raw_c in enumerate(df.columns):
+        c_name = str(raw_c).strip() if raw_c is not None and str(raw_c).strip() else f"column_{idx+1}"
+        if c_name in col_counts:
+            col_counts[c_name] += 1
+            c_name = f"{c_name}_{col_counts[c_name]}"
+        else:
+            col_counts[c_name] = 1
+        clean_cols.append(c_name)
+    df.columns = clean_cols
 
     # Clean and infer disguised numeric & date columns
     from data_profiler import clean_and_prepare_dataframe

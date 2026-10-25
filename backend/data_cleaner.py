@@ -126,6 +126,24 @@ def generate_cleaning_recommendations(df: pd.DataFrame) -> List[CleaningRecommen
                             strategy_options=["cap_iqr", "drop_outliers"]
                         ))
 
+    # 5. Constant / Zero-Variance Column Check
+    for col in df.columns:
+        non_null_s = df[col].dropna()
+        if len(non_null_s) == 0 or non_null_s.nunique() <= 1:
+            val_desc = f"all values null or constant '{non_null_s.iloc[0] if len(non_null_s) > 0 else 'null'}'"
+            recommendations.append(CleaningRecommendation(
+                id=f"rec-const-{col.lower()[:8]}-{uuid.uuid4().hex[:4]}",
+                title=f"Drop Constant / Zero-Variance Column '{col}'",
+                column=col,
+                rule="drop_constant_column",
+                severity="medium",
+                evidence=f"Column '{col}' has zero variance ({val_desc}). Zero-variance features carry no information, cause matrix singularity in linear regressions, and waste memory.",
+                affected_rows=total_rows,
+                affected_percentage=100.0,
+                recommended_action=f"Drop column '{col}' to eliminate uninformative features.",
+                strategy_options=["drop_column"]
+            ))
+
     return recommendations
 
 
@@ -153,6 +171,16 @@ def preview_cleaning_action(df: pd.DataFrame, req: CleaningActionRequest) -> Dic
 
     if not col or col not in df.columns:
         raise ValueError(f"Column '{col}' not found in dataset.")
+
+    if rule == "drop_constant_column":
+        return {
+            "rule": rule,
+            "column": col,
+            "strategy": strategy,
+            "affected_rows": len(df),
+            "affected_percentage": 100.0,
+            "summary": f"Will drop column '{col}' from dataset across all {len(df):,} rows."
+        }
 
     series = df[col]
     if rule == "impute_missing":
@@ -257,8 +285,26 @@ def apply_cleaning_action(df: pd.DataFrame, req: CleaningActionRequest) -> Tuple
         raise ValueError(f"Column '{col}' does not exist in dataset.")
 
     orig_series = clean_df[col]
-    
-    # 2. Impute Missing Values
+
+    # 2. Drop Constant / Zero-Variance Column
+    if rule == "drop_constant_column":
+        clean_df = clean_df.drop(columns=[col])
+        audit = CleaningAuditRecord(
+            id=f"audit-drop-{uuid.uuid4().hex[:6]}",
+            timestamp=now_str,
+            rule=rule,
+            column=col,
+            affected_rows=len(df),
+            affected_percentage=100.0,
+            strategy_used="drop_column",
+            transformation_summary=f"Dropped zero-variance / constant column '{col}'.",
+            original_sample=[orig_series.iloc[0] if len(orig_series) > 0 else None],
+            cleaned_sample=[],
+            reason="Zero-variance columns provide 0 predictive signal, increase dimensionality, and can trigger multicollinearity errors in regression models."
+        )
+        return clean_df, audit
+
+    # 3. Impute Missing Values
     if rule == "impute_missing":
         null_mask = orig_series.isna()
         affected = int(null_mask.sum())
