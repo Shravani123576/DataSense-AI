@@ -1,3 +1,4 @@
+import uuid
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
@@ -13,6 +14,11 @@ class DatasetMetadata(BaseModel):
     missing_cells: int
     missing_percentage: float
     column_names: List[str]
+    record_count: Optional[int] = None
+    record_count_label: Optional[str] = None
+    partial_rows_excluded: Optional[int] = 0
+    total_raw_rows: Optional[int] = None
+    missing_monthly_cells: Optional[int] = None
 
 
 class TopCategory(BaseModel):
@@ -116,6 +122,12 @@ class ChartSpec(BaseModel):
     rows_used: Optional[int] = None
     transformations: Optional[str] = None
     exclusions: Optional[str] = None
+    orientation: Optional[str] = 'v'  # 'v' (vertical) or 'h' (horizontal)
+    is_subset: Optional[bool] = False
+    total_categories: Optional[int] = None
+    displayed_categories: Optional[int] = None
+    sort_order: Optional[str] = 'desc'  # 'desc', 'asc', 'none'
+    low_frequency_note: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -140,6 +152,9 @@ class CustomChartRequest(BaseModel):
     chart_type: str  # 'bar', 'line', 'scatter', 'histogram', 'box', 'pie'
     aggregation: Optional[str] = 'mean'  # 'mean', 'sum', 'count', 'min', 'max'
     limit: Optional[int] = 20
+    orientation: Optional[str] = 'auto'  # 'auto', 'h', 'v'
+    sort_order: Optional[str] = 'desc'  # 'desc', 'asc', 'none'
+    top_n: Optional[int] = 20  # 10, 20, 50, 0 (0 means All)
 
 
 # ==========================================
@@ -168,17 +183,17 @@ class CleaningActionRequest(BaseModel):
 
 
 class CleaningAuditRecord(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
     timestamp: str
     rule: str
-    column: Optional[str]
-    affected_rows: int
-    affected_percentage: float
-    strategy_used: str
-    transformation_summary: str
+    column: Optional[str] = None
+    affected_rows: int = 0
+    affected_percentage: float = 0.0
+    strategy_used: str = "filter"
+    transformation_summary: str = ""
     original_sample: List[Any] = Field(default_factory=list)
     cleaned_sample: List[Any] = Field(default_factory=list)
-    reason: str
+    reason: str = ""
 
 
 class CleaningSummaryResponse(BaseModel):
@@ -201,7 +216,10 @@ class AutoMLRequest(BaseModel):
     task_type: Optional[str] = 'auto'  # 'auto', 'classification', 'regression'
     test_size: Optional[float] = 0.2
     metric: Optional[str] = 'auto'
+    validation_strategy: Optional[str] = 'auto'  # 'auto', 'kfold_cv', 'stratified_holdout', 'chronological'
     time_column: Optional[str] = None  # Chronological holdout validation column
+    selected_features: Optional[List[str]] = None  # User-selected predictor features
+    algorithm_filter: Optional[List[str]] = None   # Selected algorithms to benchmark
 
 
 class ModelLeaderboardItem(BaseModel):
@@ -209,8 +227,12 @@ class ModelLeaderboardItem(BaseModel):
     algorithm: str
     is_baseline: bool
     train_score: float
-    test_score: float
-    metrics: Dict[str, float]
+    val_score: float = 0.0  # Validation/Cross-Validation score used for candidate selection
+    test_score: Optional[float] = None  # Final evaluation score on untouched held-out test split (selected champion model only)
+    cv_scores_mean: Optional[float] = None
+    cv_scores_std: Optional[float] = None
+    metrics: Dict[str, float] = Field(default_factory=dict)
+    val_metrics: Optional[Dict[str, float]] = None
     overfitting_gap: float
     training_time_ms: float
     status: str = "trained"
@@ -250,14 +272,69 @@ class AutoMLResponse(BaseModel):
     chart_spec: Optional[ChartSpec] = None
     held_out_predictions: Optional[List[HeldOutPredictionSample]] = None
     evaluation_chart_spec: Optional[ChartSpec] = None
+    residual_chart_spec: Optional[ChartSpec] = None
     metric_explanations: Optional[Dict[str, str]] = None
+    model_selection_metric: Optional[str] = "Validation Cross-Validation Score (Development Set)"
+    selection_metric_rationale: Optional[str] = None
     validation_strategy: Optional[str] = "Held-out test split (isolated preprocessing)"
+    validation_rationale: Optional[str] = None
     verification_status: Optional[str] = "Model evaluated on unseen holdout test split"
     permutation_feature_importance: Optional[List[Dict[str, Any]]] = None
     error_analysis: Optional[Dict[str, Any]] = None
     multicollinearity_warnings: Optional[List[Dict[str, Any]]] = None
     baseline_drift_reference: Optional[Dict[str, Any]] = None
     reproducible_python_script: Optional[str] = None
+
+
+# ==========================================
+# Versioned Transformation & Proposal Schemas
+# ==========================================
+
+class DatasetVersionInfo(BaseModel):
+    version_id: int
+    parent_version_id: Optional[int]
+    timestamp: str
+    operation: str
+    description: str
+    affected_rows: int
+    affected_cols: int
+    total_rows: int
+    total_cols: int
+
+
+class CleaningProposal(BaseModel):
+    proposal_id: str
+    dataset_id: str
+    base_version_id: Optional[int] = None  # Active dataset version when proposal was generated
+    rule: str
+    column: Optional[str] = None
+    strategy: Optional[str] = 'median'
+    fill_value: Optional[Any] = None
+    reason: str
+    is_consequential: bool = False
+    affected_rows: int
+    affected_percentage: float
+    transformation_summary: str
+    diff_preview: Optional[Dict[str, Any]] = None
+    created_at: str
+    status: str = "pending"  # "pending", "approved", "rejected"
+
+
+class ProposalResponse(BaseModel):
+    status: str
+    proposal: CleaningProposal
+    message: str
+
+
+class CoercionAuditItem(BaseModel):
+    column: str
+    original_dtype: str
+    coerced_dtype: str
+    affected_rows: int
+    failed_coercions: int
+    sample_original: List[Any] = Field(default_factory=list)
+    sample_coerced: List[Any] = Field(default_factory=list)
+
 
 
 class WhatIfRequest(BaseModel):
@@ -421,11 +498,178 @@ class GraphIntelligenceResponse(BaseModel):
     causation_disclaimer: str = "Patterns and correlations displayed represent observed sample associations and must not be interpreted as causal mechanisms without controlled experimental evidence."
 
 
+class AgentTraceStep(BaseModel):
+    step: int
+    tool: str
+    input: Dict[str, Any] = Field(default_factory=dict)
+    output_summary: str = ""
+    duration_ms: float = 0.0
+    error: Optional[str] = None
+
+
+class StructuredAnalystAnswer(BaseModel):
+    finding: str
+    evidence: List[str] = Field(default_factory=list)
+    method: str = ""
+    limitations: List[str] = Field(default_factory=list)
+    next_step: Optional[str] = None
+
+
 class GraphIntelligenceAskRequest(BaseModel):
     dataset_id: str
-    chart_spec: Dict[str, Any]
+    chart_spec: Optional[Dict[str, Any]] = None
     x_column: str
     y_column: Optional[str] = None
     chart_type: str
     question: str
+    aggregation: Optional[str] = "mean"
+    filters: Optional[Dict[str, Any]] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None
+    conversation_id: Optional[str] = None
+    chart_signature: Optional[str] = None
+    dataset_version: Optional[int] = None
     api_key: Optional[str] = None
+
+
+class GraphIntelligenceAskResponse(BaseModel):
+    answer: StructuredAnalystAnswer
+    trace: List[AgentTraceStep] = Field(default_factory=list)
+    mode: str = Field(default="fallback", description="'llm' or 'fallback'")
+    grounded: bool = Field(default=True)
+    warnings: List[str] = Field(default_factory=list)
+
+    # Backward-compatible fields
+    findings: List[GraphFindingItem] = Field(default_factory=list)
+    computed_evidence: Dict[str, Any] = Field(default_factory=dict)
+    methodology: str = ""
+    limitations: List[str] = Field(default_factory=list)
+    suggested_next_step: Optional[str] = None
+    tools_invoked: List[str] = Field(default_factory=list)
+    trace_id: Optional[str] = None
+    execution_mode: str = Field(default="deterministic_fallback", description="'llm' or 'deterministic_fallback'")
+    disclaimer: str = "Patterns and correlations displayed represent observed sample associations and must not be interpreted as causal mechanisms without controlled experimental evidence."
+
+
+class ToolExecutionApiRequest(BaseModel):
+    tool_name: str
+    arguments: Dict[str, Any]
+    dataset_id: Optional[str] = None
+
+
+# ==========================================
+# Multi-File Ingestion & Table Inventory Models
+# ==========================================
+
+class WorksheetInfo(BaseModel):
+    sheet_name: str
+    rows: int
+    columns: int
+    column_names: List[str]
+    is_empty: bool
+    preview_rows: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class WorkbookInspectResponse(BaseModel):
+    filename: str
+    total_sheets: int
+    sheets: List[WorksheetInfo]
+
+
+class TableInventoryItem(BaseModel):
+    table_id: str
+    filename: str
+    sheet_name: Optional[str] = None
+    rows: int
+    columns: int
+    column_names: List[str]
+    inferred_types: Dict[str, str] = Field(default_factory=dict)
+    parsing_status: str  # "success" or error message
+    preview_rows: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class MultiFileUploadResponse(BaseModel):
+    session_id: str
+    total_tables: int
+    tables: List[TableInventoryItem]
+    warnings: List[str] = Field(default_factory=list)
+
+
+# ==========================================
+# Related Tables & Join Preview Models
+# ==========================================
+
+class CandidateJoinKey(BaseModel):
+    table_a_column: str
+    table_b_column: str
+    data_type_a: str
+    data_type_b: str
+    is_unique_a: bool
+    is_unique_b: bool
+    overlap_count: int
+    overlap_percentage_a: float
+    overlap_percentage_b: float
+    relationship_type: str  # "one-to-one", "one-to-many", "many-to-one", "many-to-many"
+    confidence: str  # "high", "moderate", "low"
+    explanation: str
+
+
+class TableRelationshipItem(BaseModel):
+    table_a_id: str
+    table_a_name: str
+    table_b_id: str
+    table_b_name: str
+    status: str  # "related", "independent", "ambiguous"
+    candidate_keys: List[CandidateJoinKey] = Field(default_factory=list)
+    evidence_summary: str
+
+
+class RelationshipDetectionResponse(BaseModel):
+    relationships: List[TableRelationshipItem]
+
+
+class JoinPreviewRequest(BaseModel):
+    table_a_id: str
+    table_b_id: str
+    join_column_a: str
+    join_column_b: str
+    join_type: str = "inner"  # "inner", "left", "right", "outer"
+
+
+class JoinPreviewResponse(BaseModel):
+    table_a_name: str
+    table_b_name: str
+    join_column_a: str
+    join_column_b: str
+    join_type: str
+    table_a_rows: int
+    table_b_rows: int
+    expected_rows: int
+    unmatched_rows_a: int
+    unmatched_rows_b: int
+    cartesian_multiplication_risk: bool
+    risk_warning: Optional[str] = None
+    columns_before_join: List[str]
+    columns_after_join: List[str]
+    preview_rows: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class JoinApplyRequest(BaseModel):
+    table_a_id: str
+    table_b_id: str
+    join_column_a: str
+    join_column_b: str
+    join_type: str = "inner"
+    new_dataset_name: Optional[str] = None
+
+
+class AgentChatRequest(BaseModel):
+    dataset_id: Optional[str] = None
+    dataset: Optional[str] = None
+    message: Optional[str] = None
+    question: Optional[str] = None
+    chart_type: Optional[str] = "line"
+    x_column: Optional[str] = None
+    y_column: Optional[str] = None
+    api_key: Optional[str] = None
+    conversation_history: Optional[List[Dict[str, str]]] = None
+

@@ -567,7 +567,7 @@ export const App: React.FC = () => {
             )}
 
             {activeTab === 'charts' && (
-              <VisualizerStudio profile={profile} />
+              <VisualizerStudio profile={profile} apiKey={apiKey} />
             )}
 
             {activeTab === 'zomato' && profile.is_restaurant_dataset && (

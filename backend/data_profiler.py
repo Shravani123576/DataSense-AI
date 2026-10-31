@@ -13,6 +13,7 @@ from models import (
     RecommendedNextStep
 )
 
+from data_utils import normalize_dataframe_headers_and_columns
 
 
 def try_clean_numeric_series(series: pd.Series) -> Optional[pd.Series]:
@@ -56,18 +57,43 @@ def try_clean_numeric_series(series: pd.Series) -> Optional[pd.Series]:
     return None
 
 
-def clean_and_prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+def clean_and_prepare_dataframe(df: pd.DataFrame, return_audit: bool = False):
     """
     Prepare a sanitized, properly typed DataFrame for analysis.
     Coerces disguised numeric columns and date columns into real analytical types.
+    Explicitly tracks original and coerced values, reporting affected rows and failed conversions.
     """
-    clean_df = df.copy()
+    clean_df = normalize_dataframe_headers_and_columns(df)
+    audit_records: List[Dict[str, Any]] = []
+
     for col in clean_df.columns:
+        orig_raw = clean_df[col]
+        orig_series = orig_raw.iloc[:, 0] if isinstance(orig_raw, pd.DataFrame) else orig_raw
         # Check if disguised numeric
         if not pd.api.types.is_numeric_dtype(clean_df[col]):
             num_series = try_clean_numeric_series(clean_df[col])
             if num_series is not None:
+                # Count conversions and failures (was non-null in original, but became NaN in coerced)
+                orig_notna = orig_series.notna()
+                failed_mask = orig_notna & num_series.isna()
+                failed_count = int(failed_mask.sum())
+                changed_mask = orig_notna & (orig_series.astype(str) != num_series.astype(str))
+                affected_count = int(changed_mask.sum())
+
+                sample_indices = orig_series[changed_mask].head(5).index
+                orig_samples = [str(orig_series.loc[i]) for i in sample_indices]
+                coerced_samples = [float(num_series.loc[i]) if pd.notna(num_series.loc[i]) else None for i in sample_indices]
+
                 clean_df[col] = num_series
+                audit_records.append({
+                    "column": col,
+                    "original_dtype": str(orig_series.dtype),
+                    "coerced_dtype": str(num_series.dtype),
+                    "affected_rows": int(affected_count),
+                    "failed_coercions": int(failed_count),
+                    "sample_original": orig_samples,
+                    "sample_coerced": coerced_samples,
+                })
                 continue
                 
             # Check if disguised datetime
@@ -78,11 +104,32 @@ def clean_and_prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
                     try:
                         parsed_dates = pd.to_datetime(clean_df[col], errors="coerce", format="mixed")
                         if parsed_dates.notna().sum() / len(clean_df[col].dropna()) >= 0.75:
+                            orig_notna = orig_series.notna()
+                            failed_mask = orig_notna & parsed_dates.isna()
+                            failed_count = int(failed_mask.sum())
+                            changed_mask = orig_notna
+
+                            sample_indices = orig_series[orig_notna].head(5).index
+                            orig_samples = [str(orig_series.loc[i]) for i in sample_indices]
+                            coerced_samples = [str(parsed_dates.loc[i]) if pd.notna(parsed_dates.loc[i]) else None for i in sample_indices]
+
                             clean_df[col] = parsed_dates
+                            audit_records.append({
+                                "column": col,
+                                "original_dtype": str(orig_series.dtype),
+                                "coerced_dtype": str(clean_df[col].dtype),
+                                "affected_rows": int(parsed_dates.notna().sum()),
+                                "failed_coercions": failed_count,
+                                "sample_original": orig_samples,
+                                "sample_coerced": coerced_samples,
+                            })
                     except Exception:
                         pass
-                        
+
+    if return_audit:
+        return clean_df, audit_records
     return clean_df
+
 
 
 def infer_column_type(series: pd.Series) -> str:
@@ -656,7 +703,11 @@ def profile_dataframe(
     dataset_id: str,
     name: str,
     filename: str,
-    preset_questions: List[str] = None
+    preset_questions: List[str] = None,
+    record_count_label: Optional[str] = None,
+    partial_rows_excluded: Optional[int] = 0,
+    total_raw_rows: Optional[int] = None,
+    missing_monthly_cells: Optional[int] = None
 ) -> ProfileReport:
     """Run full automated profiling on a DataFrame after clean type preparation."""
     # Coerce disguised numeric and date columns so calculations are 100% accurate
@@ -675,6 +726,11 @@ def profile_dataframe(
         name=name,
         filename=filename,
         rows=total_rows,
+        record_count=total_rows,
+        record_count_label=record_count_label,
+        partial_rows_excluded=partial_rows_excluded,
+        total_raw_rows=total_raw_rows,
+        missing_monthly_cells=missing_monthly_cells,
         columns=total_cols,
         memory_kb=memory_kb,
         duplicate_rows=duplicate_rows,

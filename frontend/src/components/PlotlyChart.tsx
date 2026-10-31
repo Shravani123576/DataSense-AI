@@ -47,12 +47,14 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
       },
     };
 
+    const effectiveHeight = plotlySpec?.layout?.height || (spec?.orientation === 'h' && spec?.data ? Math.max(height, Math.min(1200, spec.data.length * 28 + 120)) : height);
+
     if (plotlySpec && plotlySpec.data) {
       data = plotlySpec.data;
       layout = {
         ...layout,
         ...(plotlySpec.layout || {}),
-        height: height,
+        height: effectiveHeight,
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor: 'rgba(0,0,0,0)',
       };
@@ -112,6 +114,37 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
             name: spec.y_axis || 'Value',
           },
         ];
+      } else if (spec.orientation === 'h' && spec.data) {
+        const labels = spec.data.map((d) => String(d.x));
+        data = [
+          {
+            type: 'bar',
+            orientation: 'h',
+            x: spec.data.map((d) => d.y),
+            y: labels.map((l) => (l.length > 28 ? l.substring(0, 25) + '...' : l)),
+            hovertext: labels,
+            hovertemplate: `<b>%{hovertext}</b><br>${spec.y_axis || 'Value'}: %{x:,}<extra></extra>`,
+            marker: {
+              color: '#EA580C',
+              opacity: 0.9,
+              line: { color: '#C2410C', width: 1 },
+            },
+            name: spec.y_axis || 'Value',
+          },
+        ];
+        layout.yaxis = {
+          ...layout.yaxis,
+          autorange: 'reversed',
+          automargin: true,
+          title: { text: spec.x_axis || '', font: { color: '#0F3D3E', size: 12 } },
+        };
+        layout.xaxis = {
+          ...layout.xaxis,
+          automargin: true,
+          title: { text: spec.y_axis || 'Value', font: { color: '#0F3D3E', size: 12 } },
+        };
+        layout.margin = { ...layout.margin, l: 160 };
+        layout.height = effectiveHeight;
       } else if (spec.data) {
         data = [
           {
@@ -131,8 +164,10 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
         text: title,
         font: { family: 'Inter, sans-serif', size: 15, color: '#0F3D3E' },
       };
-      if (spec.x_axis) layout.xaxis.title.text = spec.x_axis;
-      if (spec.y_axis) layout.yaxis.title.text = spec.y_axis;
+      if (spec.orientation !== 'h') {
+        if (spec.x_axis) layout.xaxis.title.text = spec.x_axis;
+        if (spec.y_axis) layout.yaxis.title.text = spec.y_axis;
+      }
     }
 
     const config = {
@@ -165,10 +200,12 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
     };
   }, [spec, plotlySpec, height]);
 
+  const containerHeight = plotlySpec?.layout?.height || (spec?.orientation === 'h' && spec?.data ? Math.max(height, Math.min(1200, spec.data.length * 28 + 120)) : height);
+
   return (
     <div className={`w-full overflow-hidden ${className}`}>
-      <div ref={containerRef} style={{ width: '100%', height: `${height}px` }} />
-      {spec && (spec.data_stage || spec.rows_used || spec.transformations) && (
+      <div ref={containerRef} style={{ width: '100%', minHeight: `${containerHeight}px`, height: `${containerHeight}px` }} />
+      {spec && (spec.data_stage || spec.rows_used || spec.transformations || spec.is_subset || spec.low_frequency_note) && (
         <div
           style={{
             marginTop: '8px',
@@ -224,6 +261,22 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
             </span>
           )}
 
+          {spec.is_subset && (
+            <span
+              style={{
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                background: '#FFF7ED',
+                color: '#EA580C',
+                border: '1px solid #FED7AA',
+              }}
+            >
+              Subset: Top {spec.displayed_categories} of {spec.total_categories}
+            </span>
+          )}
+
           {spec.rows_used !== undefined && spec.rows_used !== null && (
             <span style={{ fontWeight: 600 }}>
               &bull; Rows: <strong>{spec.rows_used.toLocaleString()}</strong>
@@ -239,6 +292,12 @@ export const PlotlyChart: React.FC<PlotlyChartProps> = ({
           {spec.exclusions && (
             <span style={{ color: '#D97706', fontStyle: 'italic' }}>
               &bull; {spec.exclusions}
+            </span>
+          )}
+
+          {spec.low_frequency_note && (
+            <span style={{ color: '#0D9488', fontWeight: 600 }}>
+              &bull; ℹ️ {spec.low_frequency_note}
             </span>
           )}
         </div>

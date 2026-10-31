@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "datasense-ai": {
+      "command": "python",
+      "args": [
+        "backend/mcp_server.py"
+      ],
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "backend"
+      }
+    }
+  }
+}

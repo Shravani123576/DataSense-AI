@@ -1,188 +1,106 @@
 #!/usr/bin/env python3
 """
-DataSense AI MCP Server (JSON-RPC over stdio)
-Exposes validated DataSense AI tools conforming to the Model Context Protocol standard.
+DataSense AI MCP Server (Phase 3 / Focused MCP Resolution)
+Exposes validated DataSense AI data-science tools conforming to the Model Context Protocol standard.
+Uses the official Python MCP SDK's FastMCP server implementation, with the central
+ToolRegistry (default_registry) remaining the single source of truth for tool implementations.
 """
 import sys
+import os
 import json
 import logging
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
-# Setup simple stderr logging so stdout is reserved for JSON-RPC messages
-logging.basicConfig(stream=sys.stderr, level=logging.INFO)
+# Ensure the backend directory is in sys.path regardless of execution CWD
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
+# Setup stderr logging so stdout is strictly reserved for JSON-RPC messages
+logging.basicConfig(stream=sys.stderr, level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("datasense.mcp")
 
-# Tool Definitions
-MCP_TOOLS: List[Dict[str, Any]] = [
-    {
-        "name": "profile_dataset",
-        "description": "Examine dataset schema, compute health metrics, missing values, duplicates, and 1.5x IQR outliers.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"}
-            },
-            "required": ["dataset_id"]
-        }
-    },
-    {
-        "name": "get_cleaning_recommendations",
-        "description": "Generate evidence-backed data cleaning opportunities with affected row counts and rule strategies.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"}
-            },
-            "required": ["dataset_id"]
-        }
-    },
-    {
-        "name": "apply_cleaning_action",
-        "description": "Apply approved auditable transformation on dataset without destroying raw data, returning audit provenance.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"},
-                "rule": {"type": "string", "enum": ["deduplicate", "impute_missing", "normalize_categories", "cap_outliers"]},
-                "column": {"type": "string", "description": "Target column (optional for deduplication)"},
-                "strategy": {"type": "string", "description": "Specific strategy (e.g. median, mode, strip_and_titlecase, cap_iqr)"}
-            },
-            "required": ["dataset_id", "rule"]
-        }
-    },
-    {
-        "name": "train_automl",
-        "description": "Train dummy baseline and candidate models (Random Forest, Logistic/Ridge, Decision Trees) with leakage-free pipeline.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"},
-                "target_column": {"type": "string", "description": "Feature to predict"},
-                "task_type": {"type": "string", "enum": ["auto", "classification", "regression"], "default": "auto"}
-            },
-            "required": ["dataset_id", "target_column"]
-        }
-    },
-    {
-        "name": "what_if_predict",
-        "description": "Run counterfactual what-if simulation against trained best model and compare against baseline median.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"},
-                "target_column": {"type": "string", "description": "Target predicted feature"},
-                "feature_inputs": {"type": "object", "description": "Dictionary of modified feature values"}
-            },
-            "required": ["dataset_id", "target_column", "feature_inputs"]
-        }
-    },
-    {
-        "name": "generate_executive_report",
-        "description": "Synthesize data profiling, auditable cleaning log, and ML evaluation into executive Markdown & HTML report.",
-        "inputSchema": {
-            "type": "object",
-            "properties": {
-                "dataset_id": {"type": "string", "description": "Active session dataset ID"},
-                "objective": {"type": "string", "description": "Business or analytical objective"}
-            },
-            "required": ["dataset_id"]
-        }
-    }
-]
+from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.tools import Tool
+from mcp.server.fastmcp.utilities.func_metadata import FuncMetadata, ArgModelBase
+
+from tools import default_registry, ToolExecutionResult
+from main import (
+    DATASET_STORAGE,
+    DATASET_VERSIONS_STORAGE,
+    PROPOSED_TRANSFORMATIONS_STORAGE,
+    AUDIT_LOG_STORAGE,
+    PROFILE_STORAGE,
+    METADATA_STORAGE,
+    LAST_ML_STORAGE,
+    build_tool_context
+)
 
 
-def send_response(response: Dict[str, Any]):
-    """Write JSON-RPC message to stdout followed by newline."""
-    serialized = json.dumps(response)
-    sys.stdout.write(serialized + "\n")
-    sys.stdout.flush()
-
-
-def handle_request(req: Dict[str, Any]):
-    method = req.get("method")
-    msg_id = req.get("id")
-
-    if method == "initialize":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "datasense-ai-mcp",
-                    "version": "2.0.0"
-                }
-            }
+def get_mcp_tool_manifest() -> List[Dict[str, Any]]:
+    """Convert registered tools into official MCP Tool representation metadata."""
+    raw_tools = default_registry.list_tools()
+    mcp_tools = []
+    for t in raw_tools:
+        mcp_tools.append({
+            "name": t["name"],
+            "description": f"[{t['category'].upper()} | {t['permission'].upper()}] {t['description']}",
+            "inputSchema": t["input_schema"]
         })
-        return
+    return mcp_tools
 
-    if method == "tools/list":
-        send_response({
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": {
-                "tools": MCP_TOOLS
-            }
-        })
-        return
 
-    if method == "tools/call":
-        params = req.get("params", {})
-        tool_name = params.get("name")
-        arguments = params.get("arguments", {})
+def create_fastmcp_server() -> FastMCP:
+    """
+    Construct a FastMCP server instance using the official Python MCP SDK.
+    Dynamically registers all data-science tools from the central default_registry
+    without duplicating analytical logic.
+    """
+    mcp_app = FastMCP(
+        name="datasense-ai",
+        instructions="DataSense AI Model Context Protocol server exposing data-science, cleaning, profiling, AutoML, and statistical tools."
+    )
 
-        send_response({
-            "jsonrpc": "2.0",
-            "id": msg_id,
-            "result": {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps({
-                            "status": "ready",
-                            "tool": tool_name,
-                            "arguments": arguments,
-                            "message": f"Tool '{tool_name}' successfully resolved in DataSense AI V2 runtime."
-                        })
-                    }
-                ]
-            }
-        })
-        return
+    for tool_info in default_registry.list_tools():
+        t_name = tool_info["name"]
+        t_desc = f"[{tool_info['category'].upper()} | {tool_info['permission'].upper()}] {tool_info['description']}"
+        tool_obj = default_registry.get_tool(t_name)
+        if not tool_obj:
+            continue
 
-    # Unknown method
-    send_response({
-        "jsonrpc": "2.0",
-        "id": msg_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method '{method}' not found."
-        }
-    })
+        def make_tool_fn(target_tool_name: str):
+            def tool_fn(**kwargs):
+                dataset_id = kwargs.get("dataset_id")
+                context = build_tool_context(dataset_id)
+                res: ToolExecutionResult = default_registry.execute_tool(target_tool_name, kwargs, context)
+                return res.model_dump() if hasattr(res, "model_dump") else res.dict()
+            return tool_fn
+
+        # Subclass the tool's input schema with ArgModelBase so FastMCP can validate and describe arguments
+        tool_arg_model = type(f"{t_name}_Args", (tool_obj.input_schema, ArgModelBase), {})
+        fn_meta = FuncMetadata(arg_model=tool_arg_model)
+
+        tool = Tool(
+            fn=make_tool_fn(t_name),
+            name=t_name,
+            title=t_name.replace("_", " ").title(),
+            description=t_desc,
+            parameters=tool_arg_model.model_json_schema(by_alias=True),
+            fn_metadata=fn_meta,
+            is_async=False
+        )
+
+        mcp_app._tool_manager._tools[t_name] = tool
+
+    return mcp_app
 
 
 def main():
-    logger.info("DataSense AI MCP Server started. Listening on stdio...")
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-            handle_request(req)
-        except Exception as e:
-            logger.error(f"Error handling MCP input: {e}")
-            send_response({
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {
-                    "code": -32700,
-                    "message": f"Parse error: {str(e)}"
-                }
-            })
+    """Server entry point running official FastMCP with standard stdio transport."""
+    logger.info("Initializing DataSense AI FastMCP Server...")
+    mcp_app = create_fastmcp_server()
+    logger.info(f"FastMCP initialized with {len(mcp_app._tool_manager._tools)} tools. Starting stdio transport...")
+    mcp_app.run(transport="stdio")
 
 
 if __name__ == "__main__":

@@ -822,5 +822,548 @@ def test_healthcare_diabetes_research_dataset():
     assert "average" in q_res.json()["answer_text"].lower()
 
 
+# =====================================================================
+# PHASE 2: SCIENTIFIC CORRECTNESS & DATA INTEGRITY REGRESSION TESTS
+# =====================================================================
+
+def test_phase2_model_selection_uses_cv_validation_score_not_test_score():
+    """Verify candidate models are ranked by cross-validation on the dev set, not final test score."""
+    from main import DATASET_STORAGE
+    # Create small deterministic classification dataset
+    data = []
+    for i in range(120):
+        # FeatureA correlates with Class
+        cls = "Yes" if i % 2 == 0 else "No"
+        val = 10.0 if cls == "Yes" else 2.0
+        data.append({"FeatureA": val + (i * 0.01), "FeatureB": (i % 5) * 1.5, "Target": cls})
+    df = pd.DataFrame(data)
+    d_id = "test_phase2_model_selection"
+    DATASET_STORAGE[d_id] = df
+
+    res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Target",
+        "task_type": "classification",
+        "test_size": 0.2
+    })
+    assert res.status_code == 200
+    res_data = res.json()
+
+    # 1. Verification of separate validation and test metrics
+    assert "model_selection_metric" in res_data
+    assert "selection_metric_rationale" in res_data
+    assert "F1-Score" in res_data["model_selection_metric"]
+    assert "f1" in res_data["selection_metric_rationale"].lower()
+
+    # 2. Check leaderboard candidate ranking logic
+    leaderboard = res_data["leaderboard"]
+    trained = [m for m in leaderboard if m["status"] == "trained"]
+    assert len(trained) >= 3
+
+    # All items must have distinct val_score, test_score, train_score
+    for m in trained:
+        assert "val_score" in m
+        assert "test_score" in m
+        assert "train_score" in m
+        assert "cv_scores_mean" in m
+        assert "val_metrics" in m
+
+    # The winner must be the candidate with the highest validation score (excluding dummy baseline if competitive models exist)
+    best_candidate_name = res_data["best_model_name"]
+    best_item = next(m for m in trained if m["model_name"] == best_candidate_name)
+    max_val_score = max(m["val_score"] for m in trained if not m["is_baseline"])
+    assert best_item["val_score"] == pytest.approx(max_val_score, abs=1e-4)
+
+
+def test_phase2_incidental_date_column_does_not_force_chronological_split():
+    """Verify that incidental date columns (e.g., BirthDate) do not trigger unwanted chronological splits."""
+    from main import DATASET_STORAGE
+    # Employee dataset with BirthDate (should NOT be split chronologically for salary prediction)
+    records = []
+    base_dates = ["1985-04-12", "1990-11-23", "1978-01-15", "1995-07-30", "1988-09-05"]
+    for i in range(100):
+        records.append({
+            "EmployeeID": 1000 + i,
+            "BirthDate": base_dates[i % len(base_dates)],
+            "ExperienceYears": (i % 15) + 1,
+            "Department": "Engineering" if i % 2 == 0 else "Marketing",
+            "Salary": 50000 + ((i % 15) * 4500)
+        })
+    df = pd.DataFrame(records)
+    d_id = "test_phase2_incidental_date"
+    DATASET_STORAGE[d_id] = df
+
+    # Run AutoML without specifying chronological validation
+    res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Salary",
+        "task_type": "regression"
+    })
+    assert res.status_code == 200
+    data = res.json()
+
+    # Validation strategy MUST NOT be chronological
+    strat = data["validation_strategy"].lower()
+    assert "chronological" not in strat
+    assert "cross-validation" in strat or "holdout" in strat
+
+    # Rationale must explicitly document why chronological was not used
+    rationale = data.get("validation_rationale", "").lower()
+    assert "incidental date" in rationale or "chronological forecasting was not requested" in rationale
+
+
+def test_phase2_explicit_chronological_validation():
+    """Verify that when chronological forecasting is explicitly requested, time-series splitting is applied."""
+    from main import DATASET_STORAGE
+    # Genuine forecasting dataset
+    dates = pd.date_range("2024-01-01", periods=100, freq="D").strftime("%Y-%m-%d").tolist()
+    records = [
+        {"Timestamp": d, "TrendIndex": idx * 1.5, "Metric": idx * 10 + (idx % 3)}
+        for idx, d in enumerate(dates)
+    ]
+    df = pd.DataFrame(records)
+    d_id = "test_phase2_explicit_time"
+    DATASET_STORAGE[d_id] = df
+
+    res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Metric",
+        "task_type": "regression",
+        "validation_strategy": "chronological",
+        "time_column": "Timestamp"
+    })
+    assert res.status_code == 200
+    data = res.json()
+
+    assert "chronological" in data["validation_strategy"].lower()
+    assert "Timestamp" in data["validation_strategy"]
+    assert "future-lookahead" in data["validation_rationale"].lower() or "chronological" in data["validation_rationale"].lower()
+
+
+def test_phase2_raw_data_preservation_and_coercion_audit():
+    """Verify pristine raw data preservation, raw bytes storage, and explicit coercion audit recording."""
+    from main import RAW_BYTE_STORAGE, UNMODIFIED_RAW_STORAGE, DATASET_STORAGE
+
+    csv_content = (
+        "Product,Cost,Margin,ReleaseDate\n"
+        'Alpha,"$1,500.00",25%,2022-01-15\n'
+        'Beta,"$800.00",18%,2022-06-20\n'
+        'Gamma,"$3,200.00",30%,2023-03-10\n'
+        'Delta,"$450.00",15%,2023-05-12\n'
+        'Epsilon,"$1,100.00",20%,2023-07-04\n'
+        'Zeta,"InvalidCost",12%,2023-08-01\n'
+    ).encode("utf-8")
+
+    files = {"file": ("inventory.csv", csv_content, "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    assert upload_res.status_code == 200
+    dataset_id = upload_res.json()["metadata"]["id"]
+
+    # 1. Raw byte storage
+    assert dataset_id in RAW_BYTE_STORAGE
+    assert RAW_BYTE_STORAGE[dataset_id] == csv_content
+
+    # 2. Unmodified parsed dataset snapshot retains dirty strings
+    assert dataset_id in UNMODIFIED_RAW_STORAGE
+    raw_df = UNMODIFIED_RAW_STORAGE[dataset_id]
+    assert raw_df["Cost"].iloc[0] == "$1,500.00"
+    assert raw_df["Margin"].iloc[0] == "25%"
+
+    # 3. Working dataset in DATASET_STORAGE has coerced numeric types
+    work_df = DATASET_STORAGE[dataset_id]
+    assert work_df["Cost"].iloc[0] == 1500.0
+    assert work_df["Margin"].iloc[0] == 25.0
+
+    # 4. Check explicit coercion provenance endpoint
+    audit_res = client.get(f"/api/clean/{dataset_id}/coercions")
+    assert audit_res.status_code == 200
+    coercions = audit_res.json()
+    assert len(coercions) >= 2
+    cost_coercion = next(c for c in coercions if c["column"] == "Cost")
+    assert cost_coercion["affected_rows"] >= 3
+    # Delta had "InvalidCost" which failed numeric coercion
+    assert cost_coercion["failed_coercions"] >= 1
+
+    # 5. Export raw dataset verifies pristine data download
+    raw_export_res = client.get(f"/api/dataset/{dataset_id}/export/raw")
+    assert raw_export_res.status_code == 200
+    exported_raw_text = raw_export_res.text
+    assert "$1,500.00" in exported_raw_text
+    assert "InvalidCost" in exported_raw_text
+
+
+def test_phase2_versioned_transformation_proposal_and_rejection():
+    """Verify safe proposal workflow: proposed transformations do not mutate active dataset until approved."""
+    from main import DATASET_STORAGE, DATASET_VERSIONS_STORAGE
+
+    # Load customer churn sample
+    client.post("/api/samples/load?sample_id=customer_churn")
+    d_id = "sample_customer_churn"
+    orig_rows = len(DATASET_STORAGE[d_id])
+
+    # 1. Check version tree has V0 and V1
+    v_res = client.get(f"/api/clean/{d_id}/versions")
+    assert v_res.status_code == 200
+    versions = v_res.json()
+    assert len(versions) >= 2
+    assert versions[0]["version_id"] == 0
+    assert versions[1]["version_id"] == 1
+
+    # 2. Propose a consequential cleaning action (e.g. drop duplicates or drop rows)
+    prop_res = client.post("/api/clean/propose", json={
+        "dataset_id": d_id,
+        "rule": "deduplicate",
+        "strategy": "drop_rows"
+    })
+    assert prop_res.status_code == 200
+    prop_data = prop_res.json()
+    proposal = prop_data["proposal"]
+    proposal_id = proposal["proposal_id"]
+    assert proposal["status"] == "pending"
+
+    # ACTIVE DATASET MUST NOT BE MUTATED BY A PROPOSAL!
+    assert len(DATASET_STORAGE[d_id]) == orig_rows
+
+    # 3. Reject proposal
+    rej_res = client.post(f"/api/clean/reject/{proposal_id}")
+    assert rej_res.status_code == 200
+    assert rej_res.json()["status"] == "rejected"
+
+    # Active dataset remains unmodified
+    assert len(DATASET_STORAGE[d_id]) == orig_rows
+
+    # 4. Propose and approve another cleaning action
+    prop_res2 = client.post("/api/clean/propose", json={
+        "dataset_id": d_id,
+        "rule": "cap_outliers",
+        "column": "MonthlyCharges",
+        "strategy": "cap_iqr"
+    })
+    assert prop_res2.status_code == 200
+    prop2_id = prop_res2.json()["proposal"]["proposal_id"]
+
+    approve_res = client.post(f"/api/clean/approve/{prop2_id}")
+    assert approve_res.status_code == 200
+
+    # Version history must now include Version 2
+    v_res2 = client.get(f"/api/clean/{d_id}/versions")
+    assert v_res2.status_code == 200
+    v_list = v_res2.json()
+    assert len(v_list) >= 3
+    latest_v = v_list[-1]
+    assert latest_v["version_id"] == 2
+    assert latest_v["parent_version_id"] == 1
+    assert latest_v["operation"] == "cap_outliers"
+
+
+def test_phase2_export_integrity_preserves_approved_state_exactly():
+    """Verify that export does not apply unintended deduplication or imputation and does not mutate active dataset."""
+    from main import DATASET_STORAGE
+
+    # Create dataset with intentional duplicates and missing values
+    records = [
+        {"ID": 1, "Category": "A", "Score": 10.0},
+        {"ID": 1, "Category": "A", "Score": 10.0}, # duplicate
+        {"ID": 2, "Category": "B", "Score": None}, # missing numeric
+        {"ID": 3, "Category": "C", "Score": 30.0},
+    ]
+    df = pd.DataFrame(records)
+    d_id = "test_phase2_export_integrity"
+    DATASET_STORAGE[d_id] = df.copy()
+
+    # Call export endpoint without query flags (default parameters)
+    export_res = client.get(f"/api/dataset/{d_id}/export/cleaned")
+    assert export_res.status_code == 200
+    exported_csv = export_res.text
+
+    # Parse exported CSV to check integrity
+    exported_df = pd.read_csv(io.StringIO(exported_csv))
+
+    # Must preserve exact 4 rows (duplicates not silently dropped)
+    assert len(exported_df) == 4
+    # Must preserve the NaN in Score (missing value not silently imputed)
+    assert pd.isna(exported_df["Score"].iloc[2])
+
+    # Active dataset in memory must NOT have been mutated
+    assert len(DATASET_STORAGE[d_id]) == 4
+    assert pd.isna(DATASET_STORAGE[d_id]["Score"].iloc[2])
+
+
+def test_phase2_reset_to_raw_restores_unmodified_state_with_version_provenance():
+    """Verify reset-to-raw properly restores original un-coerced snapshot and advances version history."""
+    from main import DATASET_STORAGE, UNMODIFIED_RAW_STORAGE, DATASET_VERSIONS_STORAGE
+
+    csv_content = (
+        "Item,Price\n"
+        'Gadget A,"$100.00"\n'
+        'Gadget B,"$200.00"\n'
+    ).encode("utf-8")
+
+    files = {"file": ("gadgets.csv", csv_content, "text/csv")}
+    res = client.post("/api/upload", files=files)
+    assert res.status_code == 200
+    dataset_id = res.json()["metadata"]["id"]
+
+    # In working storage, Price is numeric 100.0
+    assert DATASET_STORAGE[dataset_id]["Price"].iloc[0] == 100.0
+
+    # Call reset to raw
+    reset_res = client.post(f"/api/clean/{dataset_id}/reset-to-raw")
+    assert reset_res.status_code == 200
+    data = reset_res.json()
+    assert data["status"] == "reverted"
+
+    # Working dataset must now match original unmodified snapshot ($100.00 string)
+    assert DATASET_STORAGE[dataset_id]["Price"].iloc[0] == "$100.00"
+
+    # Version history has recorded reset_to_raw
+    versions = DATASET_VERSIONS_STORAGE[dataset_id]
+    assert any(v["operation"] == "reset_to_raw" for v in versions)
+
+
+# =====================================================================
+# Phase 2.1: Verification Gap Regression Tests
+# =====================================================================
+
+def test_phase2_1_final_test_set_strictly_isolated_from_candidate_selection():
+    """
+    Regression Test: Final test set MUST remain untouched during candidate model ranking.
+    Only the winning champion model receives test-set evaluation (test_score is not None).
+    Non-winning candidates must NOT receive test evaluation (test_score is None).
+    """
+    # Create synthetic dataset with clear signal
+    import numpy as np
+    np.random.seed(42)
+    n = 60
+    age = np.random.randint(20, 70, size=n)
+    income = age * 1000 + np.random.randint(-2000, 2000, size=n)
+    churn = [1 if (a > 45 and inc > 45000) else 0 for a, inc in zip(age, income)]
+    
+    csv_str = "Age,Income,Churn\n" + "\n".join([f"{a},{inc},{c}" for a, inc, c in zip(age, income, churn)])
+    files = {"file": ("test_isolation_data.csv", csv_str.encode("utf-8"), "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    assert upload_res.status_code == 200
+    dataset_id = upload_res.json()["metadata"]["id"]
+
+    # Run AutoML tournament
+    ml_res = client.post("/api/automl/train", json={
+        "dataset_id": dataset_id,
+        "target_column": "Churn",
+        "task_type": "classification",
+        "validation_strategy": "kfold_cv"
+    })
+    assert ml_res.status_code == 200
+    data = ml_res.json()
+
+    leaderboard = data["leaderboard"]
+    assert len(leaderboard) >= 3
+
+    # Candidates must be ranked strictly by validation score
+    val_scores = [m["val_score"] for m in leaderboard]
+    # Non-baseline models should be ranked by val_score descending
+    trained_non_baselines = [m for m in leaderboard if not m["is_baseline"]]
+    for i in range(len(trained_non_baselines) - 1):
+        assert trained_non_baselines[i]["val_score"] >= trained_non_baselines[i + 1]["val_score"]
+
+    # 1. Champion winner (rank #1) receives final holdout test evaluation
+    winner = leaderboard[0]
+    assert winner["test_score"] is not None
+    assert isinstance(winner["test_score"], float)
+    assert winner["metrics"] != {}
+    assert "accuracy" in winner["metrics"]
+
+    # 2. All remaining candidates (rank #2+) MUST NOT have test_score evaluated
+    for candidate in leaderboard[1:]:
+        assert candidate["test_score"] is None, (
+            f"Candidate {candidate['model_name']} had test_score evaluated before/outside winner selection! "
+            "Final test set was leaked into candidate tournament."
+        )
+        assert candidate["metrics"] == {}, (
+            f"Candidate {candidate['model_name']} had holdout test metrics populated!"
+        )
+
+    # 3. Winner's independent final test metrics reported separately in response
+    assert data["best_model_name"] == winner["model_name"]
+    assert data["best_model_metrics"]["accuracy"] == winner["test_score"]
+
+
+def test_phase2_1_cleaning_proposal_stale_version_invalidation_409():
+    """
+    Regression Test: If active dataset version advances before a staged proposal is approved,
+    the proposal must be invalidated and return HTTP 409 Conflict.
+    """
+    dirty_csv = (
+        "Name,Department,Salary\n"
+        "Alice,Sales,50000\n"
+        "Alice,Sales,50000\n"  # Duplicate
+        "Bob,Eng,\n"            # Missing salary
+        "Charlie,Marketing,70000\n"
+        "David,Eng,80000\n"
+    ).encode("utf-8")
+
+    files = {"file": ("stale_test.csv", dirty_csv, "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    assert upload_res.status_code == 200
+    d_id = upload_res.json()["metadata"]["id"]
+
+    # 1. Stage proposal A (deduplicate) against initial Version 0
+    prop_res = client.post("/api/clean/propose", json={
+        "dataset_id": d_id,
+        "rule": "deduplicate",
+        "strategy": "drop_duplicates"
+    })
+    assert prop_res.status_code == 200
+    proposal_a = prop_res.json()["proposal"]
+    prop_id = proposal_a["proposal_id"]
+    assert proposal_a["base_version_id"] == 1
+
+    # 2. Advance the dataset version by applying an unrelated transformation (impute missing salary)
+    apply_res = client.post("/api/clean/apply", json={
+        "dataset_id": d_id,
+        "rule": "impute_missing",
+        "column": "Salary",
+        "strategy": "median"
+    })
+    assert apply_res.status_code == 200
+
+    # Verify version has advanced to 2
+    v_res = client.get(f"/api/clean/{d_id}/versions")
+    assert v_res.status_code == 200
+    versions = v_res.json()
+    assert versions[-1]["version_id"] == 2
+
+    # 3. Attempt to approve stale proposal A (created against version 0) -> MUST fail with 409 Conflict
+    approve_stale_res = client.post(f"/api/clean/approve/{prop_id}")
+    assert approve_stale_res.status_code == 409
+    error_detail = approve_stale_res.json()["detail"]
+    assert "stale" in error_detail.lower() or "version" in error_detail.lower()
+
+
+def test_phase2_1_cleaning_proposal_rejection_leaves_dataset_intact():
+    """
+    Regression Test: Rejecting a proposed cleaning transformation must not alter the active dataset.
+    """
+    csv_data = "ID,Score\n1,10\n2,20\n3,\n4,40\n".encode("utf-8")
+    files = {"file": ("reject_test.csv", csv_data, "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    d_id = upload_res.json()["metadata"]["id"]
+
+    # Propose dropping rows with missing score
+    prop_res = client.post("/api/clean/propose", json={
+        "dataset_id": d_id,
+        "rule": "impute_missing",
+        "column": "Score",
+        "strategy": "drop_rows"
+    })
+    assert prop_res.status_code == 200
+    prop_id = prop_res.json()["proposal"]["proposal_id"]
+
+    # Reject proposal
+    rej_res = client.post(f"/api/clean/reject/{prop_id}")
+    assert rej_res.status_code == 200
+    assert rej_res.json()["status"] == "rejected"
+
+    # Verify dataset was NOT modified (still 4 rows, including NaN)
+    audit_res = client.get(f"/api/clean/{d_id}/audit")
+    assert audit_res.json()["total_records"] == 4
+    assert audit_res.json()["total_cleaned_actions_applied"] == 0
+
+
+def test_phase2_1_validation_strategy_controls_and_task_suitability():
+    """
+    Regression Test: Validation strategy controls:
+    - Incidental dates do not trigger chronological validation when auto is selected.
+    - Explicit chronological validation on valid date column succeeds.
+    - Unsuitable validation requests raise HTTP 400.
+    """
+    # Create dataset with incidental date
+    rows = []
+    for i in range(1, 35):
+        rows.append(f"2023-01-{i%28+1:02d},C{i},{i*10},{50+i%10},{i%2}")
+    csv_content = "OrderDate,CustomerID,Tenure,MonthlyCharges,Churn\n" + "\n".join(rows)
+    files = {"file": ("dates_test.csv", csv_content.encode("utf-8"), "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    d_id = upload_res.json()["metadata"]["id"]
+
+    # 1. Incidental date with auto strategy -> must retain standard stratified/kfold validation
+    auto_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Churn",
+        "task_type": "classification",
+        "validation_strategy": "auto"
+    })
+    assert auto_res.status_code == 200
+    auto_data = auto_res.json()
+    assert "chronological" not in auto_data["validation_strategy"].lower()
+    assert "incidental date" in auto_data["validation_strategy"].lower() or "k-fold" in auto_data["validation_strategy"].lower()
+
+    # 2. Explicit chronological validation requested with OrderDate -> must apply chronological split
+    chrono_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Churn",
+        "task_type": "classification",
+        "validation_strategy": "chronological",
+        "time_column": "OrderDate"
+    })
+    assert chrono_res.status_code == 200
+    chrono_data = chrono_res.json()
+    assert "chronological" in chrono_data["validation_strategy"].lower()
+    assert "OrderDate" in chrono_data["validation_strategy"]
+
+    # 3. Unsuitable validation: Stratified validation requested for continuous regression
+    unsuitable_strat_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "MonthlyCharges",
+        "task_type": "regression",
+        "validation_strategy": "stratified_holdout"
+    })
+    assert unsuitable_strat_res.status_code == 400
+    assert "stratified" in unsuitable_strat_res.json()["detail"].lower()
+
+    # 4. Unsuitable validation: Nonexistent time column requested
+    bad_time_res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Churn",
+        "validation_strategy": "chronological",
+        "time_column": "NonexistentDateCol"
+    })
+    assert bad_time_res.status_code == 400
+    assert "not found" in bad_time_res.json()["detail"].lower()
+
+
+def test_phase2_1_imbalanced_classification_uses_macro_f1():
+    """
+    Regression Test: Imbalanced classification targets must select Macro F1
+    and provide transparent rationale explaining that it avoids majority class dominance.
+    """
+    # 70 negative class vs 10 positive class (imbalance ratio = 7.0 >= 2.5)
+    rows = []
+    for i in range(70):
+        rows.append(f"{20+i%30},{i*100},0")
+    for i in range(10):
+        rows.append(f"{50+i%20},{5000+i*200},1")
+    csv_content = "Age,Spending,Defaulter\n" + "\n".join(rows)
+
+    files = {"file": ("imbalance_test.csv", csv_content.encode("utf-8"), "text/csv")}
+    upload_res = client.post("/api/upload", files=files)
+    d_id = upload_res.json()["metadata"]["id"]
+
+    res = client.post("/api/automl/train", json={
+        "dataset_id": d_id,
+        "target_column": "Defaulter",
+        "task_type": "classification"
+    })
+    assert res.status_code == 200
+    data = res.json()
+
+    explanations = data["metric_explanations"]
+    assert "selection_criterion" in explanations
+    assert "macro f1" in explanations["selection_criterion"].lower()
+    # Check rationale transparency: explicitly mentions avoiding majority class dominance
+    assert "majority" in explanations["selection_rationale"].lower() or "imbalance" in explanations["selection_rationale"].lower()
+
+
+
+
 
 

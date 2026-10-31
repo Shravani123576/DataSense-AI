@@ -1,0 +1,21 @@
+# API keys and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+
+# Python files
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+
+# Node dependencies
+node_modules/
+dist/
+build/
+
+# System files
+.DS_Store
+Thumbs.db

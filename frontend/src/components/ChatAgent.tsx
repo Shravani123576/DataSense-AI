@@ -10,7 +10,8 @@ import {
   Copy,
   Check,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  AlertCircle
 } from 'lucide-react';
 import type { QueryResponse, ProfileReport } from '../types';
 import { queryDataset } from '../api';
@@ -93,12 +94,15 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
         },
       ]);
     } catch (err: any) {
+      const isUnconfigured = !apiKey;
       setMessages((prev) => [
         ...prev,
         {
           id: agentMsgId,
           sender: 'agent',
-          text: `⚠️ I encountered an issue analyzing that question: ${err.message || 'Unknown error'}. Please try rephrasing or select one of the suggested prompts below.`,
+          text: isUnconfigured
+            ? '⚠️ AI model not configured. Add GEMINI_API_KEY to backend/.env'
+            : `⚠️ I encountered an issue analyzing that question: ${err.message || 'Unknown error'}. Please try rephrasing or select one of the suggested prompts below.`,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -109,6 +113,16 @@ export const ChatAgent: React.FC<Props> = ({ profile, apiKey }) => {
 
   return (
     <div className="flex flex-col space-y-4 max-w-5xl mx-auto">
+      {/* Unconfigured LLM Status Notice */}
+      {!apiKey && (
+        <div className="bg-[#FFF7ED] border border-[#FED7AA] rounded-2xl p-4 flex items-center justify-between gap-3 text-sm text-[#9A3412]">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-[#EA580C] shrink-0" />
+            <span className="font-semibold">AI model not configured. Add GEMINI_API_KEY to backend/.env</span>
+          </div>
+        </div>
+      )}
+
       {/* Recommended Beginner Questions Row */}
       <div className="bg-white p-4 rounded-2xl border border-[#EAE6DF] shadow-xs">
         <div className="flex items-center gap-2 text-sm font-bold text-[#0F3D3E] mb-3">

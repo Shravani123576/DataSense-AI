@@ -4,15 +4,21 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any, Tuple, Optional
 
-from sklearn.model_selection import train_test_split
+from sklearn.base import clone, BaseEstimator, RegressorMixin
+from sklearn.model_selection import train_test_split, KFold, StratifiedKFold, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.dummy import DummyClassifier, DummyRegressor
-from sklearn.linear_model import LogisticRegression, Ridge
+from sklearn.linear_model import LogisticRegression, Ridge, LinearRegression
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import (
+    RandomForestClassifier,
+    RandomForestRegressor,
+    HistGradientBoostingClassifier,
+    HistGradientBoostingRegressor,
+)
 from sklearn.metrics import (
     accuracy_score,
     f1_score,
@@ -40,6 +46,30 @@ logger = logging.getLogger("datasense.ml_engine")
 
 # In-memory storage for active trained pipelines to support What-If simulations
 ACTIVE_ML_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+
+class NaiveModelPipeline(BaseEstimator, RegressorMixin):
+    """Naive Last-Value Baseline predictor using lag_1 strictly without lookahead."""
+    def __init__(self, lag_feature: str = "lag_1", lag_idx: int = 2):
+        self.lag_feature = lag_feature
+        self.lag_idx = lag_idx
+        self.last_train_val_ = 0.0
+
+    def fit(self, X: Any, y: Any):
+        if y is not None and len(y) > 0:
+            self.last_train_val_ = float(y.iloc[-1] if hasattr(y, "iloc") else y[-1])
+        return self
+
+    def predict(self, X: Any) -> np.ndarray:
+        if isinstance(X, pd.DataFrame) and self.lag_feature in X.columns:
+            return X[self.lag_feature].fillna(self.last_train_val_).values.astype(float)
+        elif hasattr(X, "ndim") and X.ndim == 2:
+            idx = self.lag_idx if X.shape[1] > self.lag_idx else 0
+            res = X[:, idx].astype(float)
+            if np.isnan(res).any():
+                res = np.nan_to_num(res, nan=self.last_train_val_)
+            return res
+        return np.full(len(X), self.last_train_val_)
 
 
 def detect_task_type(series: pd.Series, requested_type: Optional[str] = "auto") -> str:
@@ -141,6 +171,43 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
 
     task_type = detect_task_type(valid_df[target_col], req_type)
     
+    # ---------------------------------------------------------
+    # Time-Aware Feature Engineering for Time-Indexed Series
+    # ---------------------------------------------------------
+    time_series_features = ["Year", "year_index", "lag_1", "lag_2", "rolling_mean_3", "rolling_mean_5", "diff_1"]
+    has_year_index = False
+    years_list = None
+    if isinstance(valid_df.index, pd.MultiIndex):
+        first_level = [x[0] if isinstance(x, tuple) else x for x in valid_df.index]
+        try:
+            years_list = [int(x) for x in first_level]
+            has_year_index = True
+        except (ValueError, TypeError):
+            pass
+    elif pd.api.types.is_numeric_dtype(valid_df.index) and len(valid_df.index) > 0 and (valid_df.index > 1800).all() and (valid_df.index < 2100).all():
+        years_list = [int(x) for x in valid_df.index]
+        has_year_index = True
+    elif "Year" in valid_df.columns:
+        years_list = [int(x) for x in valid_df["Year"]]
+        has_year_index = True
+
+    other_cols = [c for c in valid_df.columns if c != target_col]
+    wants_ts_features = bool(req.selected_features and any(f in req.selected_features for f in time_series_features))
+    is_time_series = task_type == "regression" and ((has_year_index and (len(other_cols) == 0 or wants_ts_features)) or (req.validation_strategy == "chronological" and has_year_index))
+
+    if is_time_series:
+        if years_list and len(years_list) == len(valid_df):
+            valid_df["Year"] = years_list
+        valid_df["year_index"] = np.arange(len(valid_df))
+        target_s = valid_df[target_col]
+        valid_df["lag_1"] = target_s.shift(1)
+        valid_df["lag_2"] = target_s.shift(2)
+        valid_df["rolling_mean_3"] = target_s.shift(1).rolling(3).mean()
+        valid_df["rolling_mean_5"] = target_s.shift(1).rolling(5).mean()
+        valid_df["diff_1"] = target_s.shift(1) - target_s.shift(2)
+        valid_df = valid_df.dropna().reset_index(drop=True)
+        total_len = len(valid_df)
+
     # Select candidate feature columns (exclude target, id-like high cardinality strings)
     candidate_features = []
     total_len = len(valid_df)
@@ -155,8 +222,16 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
             continue
         candidate_features.append(c)
 
+    # Filter candidate features if user explicitly selected a predictor subset
+    if req.selected_features and len(req.selected_features) > 0:
+        req_set = set(req.selected_features)
+        candidate_features = [c for c in candidate_features if c in req_set]
+
     if not candidate_features:
-        raise ValueError("No valid predictive features remaining after filtering identifiers.")
+        if is_time_series:
+            candidate_features = [f for f in time_series_features if f in valid_df.columns and f != target_col]
+        else:
+            raise ValueError("No valid predictive features remaining. Please ensure at least one predictor feature is selected.")
 
     X = valid_df[candidate_features]
     y = valid_df[target_col]
@@ -165,14 +240,20 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
     class_labels = None
     class_distribution = None
     if task_type == "classification":
-        y_str = y.astype(str)
-        class_counts = y_str.value_counts().to_dict()
-        class_distribution = {str(k): int(v) for k, v in class_counts.items()}
-        class_labels = list(class_counts.keys())
-        # If too many classes (> 20), warn
-        if len(class_labels) > 20:
-            raise ValueError(f"Target column '{target_col}' has {len(class_labels)} unique classes. Classification is limited to <= 20 distinct classes.")
-        y = y_str
+        if not pd.api.types.is_numeric_dtype(y):
+            y_str = y.astype(str)
+            class_counts = y_str.value_counts().to_dict()
+            class_distribution = {str(k): int(v) for k, v in class_counts.items()}
+            class_labels = list(class_counts.keys())
+            if len(class_labels) > 20:
+                raise ValueError(f"Target column '{target_col}' has {len(class_labels)} unique classes. Classification is limited to <= 20 distinct classes.")
+            y = y_str
+        else:
+            class_counts = y.value_counts().to_dict()
+            class_distribution = {str(k): int(v) for k, v in class_counts.items()}
+            class_labels = [str(k) for k in class_counts.keys()]
+            if len(class_labels) > 20:
+                raise ValueError(f"Target column '{target_col}' has {len(class_labels)} unique classes. Classification is limited to <= 20 distinct classes.")
 
     # Multicollinearity Check
     multicollinearity_warnings = []
@@ -199,29 +280,70 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
     test_size = float(req.test_size or 0.2)
     test_size = max(0.1, min(0.4, test_size))
     
-    # Check for time column for chronological holdout split
-    time_col = req.time_column if (req.time_column and req.time_column in valid_df.columns) else None
-    if not time_col:
-        for c in valid_df.columns:
-            if c != target_col and (pd.api.types.is_datetime64_any_dtype(valid_df[c]) or (c.lower() in ["orderdate", "date", "timestamp", "datetime"] and pd.to_datetime(valid_df[c], errors="coerce").notna().mean() > 0.8)):
-                time_col = c
-                break
+    # ---------------------------------------------------------
+    # Time-Aware Validation vs. Standard Cross-Validation
+    # Only force chronological validation if explicitly requested
+    # (via req.validation_strategy == 'chronological' or explicit req.time_column).
+    # Incidental date columns (e.g. BirthDate, Date) must NOT force chronological split!
+    # ---------------------------------------------------------
+    req_strat = (req.validation_strategy or "auto").lower()
+    allowed_strategies = ["auto", "kfold_cv", "stratified_holdout", "chronological"]
+    if req_strat not in allowed_strategies:
+        raise ValueError(f"Unsupported validation strategy '{req.validation_strategy}'. Supported options: {', '.join(allowed_strategies)}.")
 
-    val_strategy = f"{int((1-test_size)*100)}/{int(test_size*100)} train/test holdout split with isolated preprocessing pipeline (leakage-safe)"
-    if time_col:
+    if req_strat == "stratified_holdout" and task_type == "regression":
+        raise ValueError("Stratified validation is only applicable to categorical classification tasks, not continuous regression.")
+
+    time_col = None
+    is_chronological = False
+    
+    if req_strat == "chronological" or req.time_column:
+        if req.time_column:
+            if req.time_column not in valid_df.columns:
+                raise ValueError(f"Specified time_column '{req.time_column}' was not found in dataset.")
+            time_col = req.time_column
+        else:
+            for c in valid_df.columns:
+                if c != target_col and (pd.api.types.is_datetime64_any_dtype(valid_df[c]) or (c.lower() in ["orderdate", "date", "timestamp", "datetime"] and pd.to_datetime(valid_df[c], errors="coerce").notna().mean() > 0.8)):
+                    time_col = c
+                    break
+        if not time_col:
+            raise ValueError("Chronological validation was requested, but no valid date or timestamp column was found in the dataset.")
+        
+        if len(valid_df) < 10:
+            raise ValueError("Dataset has insufficient observations (< 10 rows) for chronological time-series splitting.")
+            
+        time_series_parsed = pd.to_datetime(valid_df[time_col], errors="coerce")
+        if time_series_parsed.notna().sum() < 5:
+            raise ValueError(f"Column '{time_col}' contains insufficient valid dates for chronological time-series splitting.")
+            
+        is_chronological = True
+
+    date_cols_found = [c for c in valid_df.columns if c != target_col and (pd.api.types.is_datetime64_any_dtype(valid_df[c]) or any(d in c.lower() for d in ["date", "time", "dob", "birth"]))]
+
+    if is_time_series:
+        is_chronological = True
+        split_point = int(len(valid_df) * (1.0 - test_size))
+        X_dev, X_test = X.iloc[:split_point], X.iloc[split_point:]
+        y_dev, y_test = y.iloc[:split_point], y.iloc[split_point:]
+        val_strategy = "Time-ordered holdout"
+        val_rationale = "Chronological time-ordered holdout split preserving temporal ordering. Historical observations used for training; subsequent observations used for out-of-sample forward evaluation."
+    elif is_chronological and time_col:
         try:
             time_series_parsed = pd.to_datetime(valid_df[time_col], errors="coerce")
-            sorted_idx = time_series_parsed.sort_values().index
+            sorted_idx = time_series_parsed.sort_values(na_position="first").index
             X_sorted = X.loc[sorted_idx]
             y_sorted = y.loc[sorted_idx]
             split_point = int(len(valid_df) * (1.0 - test_size))
-            X_train, X_test = X_sorted.iloc[:split_point], X_sorted.iloc[split_point:]
-            y_train, y_test = y_sorted.iloc[:split_point], y_sorted.iloc[split_point:]
-            val_strategy = f"Chronological time-series holdout split on '{time_col}' ({int((1-test_size)*100)}% train / {int(test_size*100)}% test, un-shuffled) preventing lookahead leakage"
-        except Exception:
-            time_col = None
+            X_dev, X_test = X_sorted.iloc[:split_point], X_sorted.iloc[split_point:]
+            y_dev, y_test = y_sorted.iloc[:split_point], y_sorted.iloc[split_point:]
+            val_strategy = f"Chronological time-series split on '{time_col}' ({int((1-test_size)*100)}% dev / {int(test_size*100)}% test, un-shuffled) preventing lookahead leakage"
+            val_rationale = f"Chronological validation applied strictly along '{time_col}'. Observations partitioned in chronological order to simulate real-world forward testing without future-lookahead leakage."
+        except Exception as e:
+            logger.warning(f"Chronological split failed: {e}; falling back to standard dev/test split.")
+            is_chronological = False
 
-    if not time_col:
+    if not is_chronological:
         stratify_arg = None
         if task_type == "classification":
             min_class_count = min(class_distribution.values()) if class_distribution else 0
@@ -229,33 +351,105 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
                 stratify_arg = y
 
         try:
-            X_train, X_test, y_train, y_test = train_test_split(
+            X_dev, X_test, y_dev, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=42, stratify=stratify_arg
             )
         except ValueError as split_err:
             logger.warning(f"Stratified split failed ({split_err}); falling back to unstratified split.")
-            X_train, X_test, y_train, y_test = train_test_split(
+            X_dev, X_test, y_dev, y_test = train_test_split(
                 X, y, test_size=test_size, random_state=42, stratify=None
             )
 
-    preprocessor, num_cols, cat_cols = build_preprocessor(valid_df, candidate_features)
+        if req_strat == "kfold_cv":
+            val_strategy = f"5-Fold Cross-Validation on Development Partition ({int((1-test_size)*100)}% dev / {int(test_size*100)}% holdout test)"
+            val_rationale = "User-selected 5-Fold Cross-Validation. Candidate models evaluated across 5 development folds; winning model evaluated independently on held-out test split."
+        elif req_strat == "stratified_holdout":
+            val_strategy = f"Stratified Holdout Validation ({int((1-test_size)*100)}% dev / {int(test_size*100)}% holdout test)"
+            val_rationale = "User-selected Stratified Holdout. Class distributions preserved across development folds and held-out test set."
+        elif date_cols_found:
+            val_strategy = f"Stratified/K-Fold Cross-Validation on Development Partition ({int((1-test_size)*100)}% dev / {int(test_size*100)}% holdout test)"
+            val_rationale = f"Standard stratified/k-fold cross-validation on development split selected. (Note: Detected incidental date column(s) {date_cols_found}; retained standard cross-validation because analytical objective was not configured for chronological forecasting)."
+        else:
+            val_strategy = f"Stratified/K-Fold Cross-Validation on Development Partition ({int((1-test_size)*100)}% dev / {int(test_size*100)}% holdout test)"
+            val_rationale = "Standard stratified/k-fold cross-validation on development split selected with isolated untouched holdout test partition."
 
-    # Detect class imbalance for weighted loss
+    X_train, y_train = X_dev, y_dev
+
+    # Fit preprocessor strictly on development data to guarantee zero leakage into test set
+    if is_time_series:
+        preprocessor = ColumnTransformer(
+            transformers=[("num", SimpleImputer(strategy="median"), candidate_features)],
+            remainder="drop"
+        )
+        num_cols, cat_cols = candidate_features, []
+    else:
+        preprocessor, num_cols, cat_cols = build_preprocessor(X_train, candidate_features)
+
+    # Detect class imbalance for weighted loss and selection metric
     is_imbalanced = False
     if task_type == "classification" and class_distribution:
         counts = list(class_distribution.values())
         if len(counts) >= 2 and (max(counts) / (min(counts) or 1)) >= 2.5:
             is_imbalanced = True
 
+    # Setup Cross-Validation on Development Set (X_train, y_train)
+    n_dev = len(X_train)
+    if is_time_series:
+        n_splits = min(3, max(2, n_dev // 20))
+        cv = TimeSeriesSplit(n_splits=n_splits)
+    elif is_chronological:
+        n_splits = min(3, max(2, n_dev // 10))
+        cv = TimeSeriesSplit(n_splits=n_splits)
+    elif task_type == "classification":
+        min_class_dev = min(pd.Series(y_train).value_counts().to_dict().values()) if len(y_train) > 0 else 0
+        n_splits = min(5, max(2, min_class_dev))
+        if n_splits >= 2:
+            cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+        else:
+            cv = KFold(n_splits=min(3, max(2, n_dev // 5)), shuffle=True, random_state=42)
+    else:
+        n_splits = min(5, max(2, n_dev // 5))
+        cv = KFold(n_splits=n_splits, shuffle=True, random_state=42)
+
+    # Selection Metric Definition & Transparent Rationale
+    if task_type == "classification":
+        if is_imbalanced:
+            selection_metric_name = "Macro F1-Score (Cross-Validation on Dev Set)"
+            selection_metric_rationale = (
+                "Macro F1-Score was chosen as the model selection criterion because significant class imbalance was detected. "
+                "Unlike weighted F1 or accuracy (which weight by support and can be dominated by majority classes), "
+                "Macro F1 computes the unweighted arithmetic mean of F1 across all classes, penalizing models that sacrifice minority classes."
+            )
+        else:
+            selection_metric_name = "Weighted F1-Score (Cross-Validation on Dev Set)"
+            selection_metric_rationale = (
+                "Weighted F1-Score was chosen as the model selection criterion for balanced class distribution, "
+                "evaluating harmonic precision and recall across validation folds."
+            )
+    else:
+        selection_metric_name = "R² Score (Cross-Validation on Dev Set)"
+        selection_metric_rationale = (
+            "R² was chosen as the model selection criterion because it measures the proportion of variance explained by the model on unseen validation folds relative to baseline."
+        )
+
     # Define model candidates
     candidates = []
-    if task_type == "classification":
+    if is_time_series:
+        lag1_idx = candidate_features.index("lag_1") if "lag_1" in candidate_features else 0
+        candidates = [
+            ("Naive Baseline", "Last-Value Baseline Model", True, NaiveModelPipeline(lag_feature="lag_1", lag_idx=lag1_idx)),
+            ("Linear Regression", "Ordinary Least Squares Linear Model", False, LinearRegression()),
+            ("Ridge Regression", "L2 Regularized Linear Model", False, Ridge(alpha=1.0, random_state=42)),
+            ("Random Forest", "Ensemble Bagging Trees", False, RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42)),
+        ]
+    elif task_type == "classification":
         clf_weight = "balanced" if is_imbalanced else None
         candidates = [
             ("Baseline Dummy", "Most Frequent Class", True, DummyClassifier(strategy="most_frequent")),
             ("Logistic Regression", "L2 Regularized Linear Classifier" + (" (Class Balanced)" if is_imbalanced else ""), False, LogisticRegression(max_iter=1000, random_state=42, class_weight=clf_weight)),
             ("Decision Tree", "CART Tree Classifier", False, DecisionTreeClassifier(max_depth=6, random_state=42, class_weight=clf_weight)),
             ("Random Forest", "Ensemble Bagging Trees" + (" (Class Balanced)" if is_imbalanced else ""), False, RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, class_weight=clf_weight)),
+            ("Gradient Boosting", "Histogram Gradient Boosting Ensemble" + (" (Class Balanced)" if is_imbalanced else ""), False, HistGradientBoostingClassifier(max_iter=100, max_depth=6, random_state=42, class_weight=clf_weight)),
         ]
     else:
         candidates = [
@@ -263,81 +457,81 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
             ("Ridge Regression", "L2 Regularized Linear Model", False, Ridge(alpha=1.0, random_state=42)),
             ("Decision Tree", "CART Tree Regressor", False, DecisionTreeRegressor(max_depth=6, random_state=42)),
             ("Random Forest", "Ensemble Bagging Trees", False, RandomForestRegressor(n_estimators=100, max_depth=8, random_state=42)),
+            ("Gradient Boosting", "Histogram Gradient Boosting Ensemble", False, HistGradientBoostingRegressor(max_iter=100, max_depth=6, random_state=42)),
         ]
+
+    # Filter candidate models if user chose specific algorithms
+    if req.algorithm_filter and len(req.algorithm_filter) > 0:
+        filter_lower = [af.lower() for af in req.algorithm_filter]
+        filtered = [
+            c for c in candidates
+            if c[2] or any(fl in c[0].lower() or fl in c[1].lower() for fl in filter_lower)
+        ]
+        if len(filtered) > 1:
+            candidates = filtered
 
     leaderboard: List[ModelLeaderboardItem] = []
     trained_pipelines: Dict[str, Pipeline] = {}
 
+    # Candidate evaluation loop: STRICTLY evaluates on development set (X_train, y_train)
+    # The final test set (X_test, y_test) is NEVER evaluated during candidate ranking/selection!
     for name, algo_desc, is_base, estimator in candidates:
         try:
             start_t = time.perf_counter()
+
+            # Cross-validation on development partition (X_train, y_train)
+            cv_scores = []
+            for fold_train_idx, fold_val_idx in cv.split(X_train, y_train):
+                X_tr, X_va = X_train.iloc[fold_train_idx], X_train.iloc[fold_val_idx]
+                y_tr, y_va = y_train.iloc[fold_train_idx], y_train.iloc[fold_val_idx]
+
+                fold_pipe = Pipeline([
+                    ("preprocessor", clone(preprocessor)),
+                    ("estimator", clone(estimator))
+                ])
+                fold_pipe.fit(X_tr, y_tr)
+                y_va_pred = fold_pipe.predict(X_va)
+
+                if task_type == "classification":
+                    if is_imbalanced:
+                        fold_score = float(f1_score(y_va, y_va_pred, average="macro", zero_division=0))
+                    else:
+                        fold_score = float(f1_score(y_va, y_va_pred, average="weighted", zero_division=0))
+                else:
+                    fold_score = float(r2_score(y_va, y_va_pred))
+                cv_scores.append(fold_score)
+
+            cv_mean = float(np.mean(cv_scores)) if cv_scores else 0.0
+            cv_std = float(np.std(cv_scores)) if cv_scores else 0.0
+            val_score = round(cv_mean, 4)
+
+            # Fit candidate pipeline on FULL development set
             pipe = Pipeline([
-                ("preprocessor", preprocessor),
-                ("estimator", estimator)
+                ("preprocessor", clone(preprocessor)),
+                ("estimator", clone(estimator))
             ])
             pipe.fit(X_train, y_train)
             dur_ms = round((time.perf_counter() - start_t) * 1000, 2)
 
-            # Predictions
+            # Predictions on training development set
             y_train_pred = pipe.predict(X_train)
-            y_test_pred = pipe.predict(X_test)
-
-            metrics: Dict[str, float] = {}
-            train_score = 0.0
-            test_score = 0.0
-
             if task_type == "classification":
-                acc = float(accuracy_score(y_test, y_test_pred))
-                f1 = float(f1_score(y_test, y_test_pred, average="weighted", zero_division=0))
-                prec = float(precision_score(y_test, y_test_pred, average="weighted", zero_division=0))
-                rec = float(recall_score(y_test, y_test_pred, average="weighted", zero_division=0))
-                
-                train_acc = float(accuracy_score(y_train, y_train_pred))
-                train_score = round(train_acc, 4)
-                test_score = round(acc, 4)
+                train_score = round(float(accuracy_score(y_train, y_train_pred)), 4)
+            else:
+                train_score = round(float(r2_score(y_train, y_train_pred)), 4)
 
-                metrics = {
-                    "accuracy": test_score,
-                    "f1_score": round(f1, 4),
-                    "precision": round(prec, 4),
-                    "recall": round(rec, 4),
-                }
-
-                # Attempt ROC-AUC for binary or multiclass
-                try:
-                    if hasattr(pipe.named_steps["estimator"], "predict_proba"):
-                        proba = pipe.predict_proba(X_test)
-                        if len(class_labels) == 2:
-                            auc = float(roc_auc_score(y_test, proba[:, 1]))
-                        else:
-                            auc = float(roc_auc_score(y_test, proba, multi_class="ovr", average="weighted"))
-                        metrics["roc_auc"] = round(auc, 4)
-                except Exception:
-                    pass
-
-            else:  # regression
-                r2 = float(r2_score(y_test, y_test_pred))
-                rmse = float(np.sqrt(mean_squared_error(y_test, y_test_pred)))
-                mae = float(mean_absolute_error(y_test, y_test_pred))
-
-                train_r2 = float(r2_score(y_train, y_train_pred))
-                train_score = round(train_r2, 4)
-                test_score = round(r2, 4)
-
-                metrics = {
-                    "r2_score": test_score,
-                    "rmse": round(rmse, 4),
-                    "mae": round(mae, 4),
-                }
-
-            gap = round(train_score - test_score, 4)
+            gap = round(train_score - val_score, 4)
             leaderboard.append(ModelLeaderboardItem(
                 model_name=name,
                 algorithm=algo_desc,
                 is_baseline=is_base,
                 train_score=train_score,
-                test_score=test_score,
-                metrics=metrics,
+                val_score=val_score,
+                test_score=None,  # Strictly isolated: untouched test set is not evaluated during candidate tournament
+                cv_scores_mean=round(cv_mean, 4),
+                cv_scores_std=round(cv_std, 4),
+                metrics={},
+                val_metrics={"cv_val_score": val_score, "cv_std": round(cv_std, 4)},
                 overfitting_gap=gap,
                 training_time_ms=dur_ms,
                 status="trained"
@@ -351,23 +545,52 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
                 algorithm=algo_desc,
                 is_baseline=is_base,
                 train_score=0.0,
-                test_score=0.0,
+                val_score=0.0,
+                test_score=None,
                 metrics={"error": 1.0},
                 overfitting_gap=0.0,
                 training_time_ms=0.0,
                 status=f"failed: {str(e)[:50]}"
             ))
 
-    # Rank candidates by test score (excluding failed)
+    # Rank candidates STRICTLY by validation score on development folds (val_score), NOT by test score!
     valid_candidates = [m for m in leaderboard if m.status == "trained"]
     if not valid_candidates:
         raise RuntimeError("All candidate models failed during training.")
 
-    # Sort descending by test score
-    valid_candidates.sort(key=lambda m: m.test_score, reverse=True)
-    best_item = valid_candidates[0]
+    # Sort descending by val_score; non-baseline models preferred on ties
+    leaderboard.sort(key=lambda m: (m.status == "trained", not m.is_baseline, m.val_score), reverse=True)
+    best_item = leaderboard[0]
     best_name = best_item.model_name
     best_pipe = trained_pipelines[best_name]
+
+    # ---------------------------------------------------------
+    # FINAL TEST EVALUATION: PERFORMED ON HELD-OUT TEST SET
+    # Strictly applied to the WINNING model to maintain test set isolation
+    # ---------------------------------------------------------
+    best_test_pred = best_pipe.predict(X_test)
+    if task_type == "regression":
+        best_r2 = float(r2_score(y_test, best_test_pred))
+        best_rmse = float(np.sqrt(mean_squared_error(y_test, best_test_pred)))
+        best_mae = float(mean_absolute_error(y_test, best_test_pred))
+        best_bias = float(np.mean(best_test_pred - y_test))
+        best_item.test_score = round(best_r2, 4)
+        best_item.metrics = {
+            "r2_score": round(best_r2, 4),
+            "rmse": round(best_rmse, 4),
+            "mae": round(best_mae, 4),
+            "bias": round(best_bias, 4),
+            "signed_mean_error": round(best_bias, 4),
+        }
+    else:
+        best_acc = float(accuracy_score(y_test, best_test_pred))
+        best_item.test_score = round(best_acc, 4)
+        best_item.metrics = {
+            "accuracy": round(best_acc, 4)
+        }
+
+    final_test_score = best_item.test_score
+    test_metrics = best_item.metrics
 
     # Compute Feature Importance
     feature_importances: List[FeatureImportanceItem] = []
@@ -540,6 +763,34 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
             exclusions="Training observations excluded to prevent data leakage"
         )
 
+    # Construct Held-Out Residual Chart
+    residual_chart_spec = None
+    if task_type == "regression":
+        res_pts = [
+            {"x": round(float(best_test_pred[i]), 3), "y": round(float(best_test_pred[i] - y_test.iloc[i]), 3)}
+            for i in range(len(y_test))
+        ]
+        plotly_res = create_plotly_spec(
+            chart_type="scatter",
+            title=f"Residual Plot: Predicted vs Error ({best_name})",
+            x_axis=f"Predicted {target_col}",
+            y_axis="Residual (Predicted - Actual)",
+            points=res_pts
+        )
+        residual_chart_spec = ChartSpec(
+            chart_type="scatter",
+            title=f"Residual Plot: Predicted vs Error ({best_name})",
+            x_axis=f"Predicted {target_col}",
+            y_axis="Residual (Predicted - Actual)",
+            data=res_pts,
+            description=f"Residual diagnostics across {len(y_test)} held-out observations evaluating bias and homoscedasticity for {best_name}.",
+            plotly_spec=plotly_res,
+            data_stage="model_ready_held_out",
+            rows_used=len(X_test),
+            transformations=f"Holdout residual computation for {best_name}",
+            exclusions="Training observations excluded to prevent data leakage"
+        )
+
     # Chart Spec for Leaderboard Comparison
     leaderboard_chart = ChartSpec(
         chart_type="bar",
@@ -578,22 +829,25 @@ def train_automl_pipeline(df: pd.DataFrame, req: AutoMLRequest) -> AutoMLRespons
     }
 
     # Plain-English metric explanations
-    metric_explanations: Dict[str, str] = {}
+    metric_explanations: Dict[str, str] = {
+        "selection_criterion": selection_metric_name,
+        "selection_rationale": selection_metric_rationale,
+    }
     if task_type == "classification":
-        metric_explanations = {
+        metric_explanations.update({
             "accuracy": "Proportion of total held-out test predictions that were exactly correct.",
             "f1_score": "Harmonic balance between precision and recall (robust against class imbalance).",
             "precision": "Accuracy of positive predictions; fraction of predicted positive cases that were truly positive.",
             "recall": "Sensitivity; fraction of actual positive observations in the test set successfully identified.",
-        }
+        })
         if "roc_auc" in best_item.metrics:
             metric_explanations["roc_auc"] = "Discrimination capability across decision thresholds (0.5 is random chance, 1.0 is optimal separation)."
     else:
-        metric_explanations = {
+        metric_explanations.update({
             "r2_score": f"Coefficient of determination (R²); proportion of variance in '{target_col}' explained by the model (1.0 is perfect prediction).",
             "mae": f"Mean Absolute Error; average absolute error in original units of '{target_col}'.",
             "rmse": f"Root Mean Squared Error; average prediction error with higher penalty for large errors in '{target_col}'.",
-        }
+        })
 
     # Error Analysis on Holdout Predictions
     error_analysis: Dict[str, Any] = {}
@@ -721,8 +975,12 @@ pipeline = Pipeline([
         chart_spec=leaderboard_chart,
         held_out_predictions=held_out_samples,
         evaluation_chart_spec=eval_chart_spec,
+        residual_chart_spec=residual_chart_spec,
         metric_explanations=metric_explanations,
+        model_selection_metric=selection_metric_name,
+        selection_metric_rationale=selection_metric_rationale,
         validation_strategy=val_strategy,
+        validation_rationale=val_rationale,
         verification_status=verif_status,
         error_analysis=error_analysis,
         multicollinearity_warnings=multicollinearity_warnings,

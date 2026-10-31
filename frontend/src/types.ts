@@ -109,6 +109,13 @@ export interface ChartSpec {
   rows_used?: number | null;
   transformations?: string | null;
   exclusions?: string | null;
+  orientation?: 'v' | 'h' | null;
+  is_subset?: boolean;
+  total_categories?: number | null;
+  displayed_categories?: number | null;
+  sort_order?: 'desc' | 'asc' | 'none' | null;
+  low_frequency_note?: string | null;
+  aggregation?: string | null;
 }
 
 
@@ -187,6 +194,43 @@ export interface CleaningSummaryResponse {
 }
 
 // ==========================================
+export interface DatasetVersionInfo {
+  version_id: number;
+  parent_version_id: number;
+  timestamp: string;
+  operation: string;
+  description: string;
+  affected_rows: number;
+  affected_cols: number;
+  total_rows: number;
+  total_cols: number;
+}
+
+export interface CleaningProposal {
+  proposal_id: string;
+  dataset_id: string;
+  base_version_id?: number | null;
+  rule: string;
+  column?: string | null;
+  strategy?: string;
+  fill_value?: any;
+  reason: string;
+  is_consequential: boolean;
+  affected_rows: number;
+  affected_percentage: number;
+  transformation_summary: string;
+  diff_preview?: any;
+  created_at: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface ProposalResponse {
+  status: string;
+  proposal: CleaningProposal;
+  message: string;
+}
+
+// ==========================================
 // Stage 4: AutoML & What-If Types
 // ==========================================
 
@@ -196,6 +240,10 @@ export interface AutoMLRequest {
   task_type?: 'auto' | 'classification' | 'regression';
   test_size?: number;
   metric?: string;
+  validation_strategy?: 'auto' | 'kfold_cv' | 'stratified_holdout' | 'chronological';
+  time_column?: string | null;
+  selected_features?: string[];
+  algorithm_filter?: string[];
 }
 
 export interface ModelLeaderboardItem {
@@ -203,7 +251,10 @@ export interface ModelLeaderboardItem {
   algorithm: string;
   is_baseline: boolean;
   train_score: number;
-  test_score: number;
+  val_score?: number;
+  test_score?: number | null;
+  cv_scores_mean?: number | null;
+  cv_scores_std?: number | null;
   metrics: Record<string, number>;
   overfitting_gap: number;
   training_time_ms: number;
@@ -244,6 +295,7 @@ export interface AutoMLResponse {
   chart_spec?: ChartSpec | null;
   held_out_predictions?: HeldOutPredictionSample[] | null;
   evaluation_chart_spec?: ChartSpec | null;
+  residual_chart_spec?: ChartSpec | null;
   metric_explanations?: Record<string, string> | null;
   validation_strategy?: string | null;
   verification_status?: string | null;
@@ -335,5 +387,107 @@ export interface ExecutiveReportResponse {
   executive_summary: string;
   recommendations: string[];
   limitations: string[];
+}
+
+// ==========================================
+// Multi-File Ingestion & Table Relationships
+// ==========================================
+
+export interface WorksheetInfo {
+  sheet_name: string;
+  rows: number;
+  columns: number;
+  column_names: string[];
+  is_empty: boolean;
+  preview_rows: Record<string, any>[];
+}
+
+export interface WorkbookInspectResponse {
+  filename: string;
+  total_sheets: number;
+  sheets: WorksheetInfo[];
+}
+
+export interface TableInventoryItem {
+  table_id: string;
+  filename: string;
+  sheet_name?: string | null;
+  rows: number;
+  columns: number;
+  column_names: string[];
+  inferred_types: Record<string, string>;
+  parsing_status: string;
+  preview_rows: Record<string, any>[];
+}
+
+export interface MultiFileUploadResponse {
+  session_id: string;
+  total_tables: number;
+  tables: TableInventoryItem[];
+  warnings: string[];
+}
+
+export interface CandidateJoinKey {
+  table_a_column: string;
+  table_b_column: string;
+  data_type_a: string;
+  data_type_b: string;
+  is_unique_a: boolean;
+  is_unique_b: boolean;
+  overlap_count: number;
+  overlap_percentage_a: number;
+  overlap_percentage_b: number;
+  relationship_type: string;
+  confidence: string;
+  explanation: string;
+}
+
+export interface TableRelationshipItem {
+  table_a_id: string;
+  table_a_name: string;
+  table_b_id: string;
+  table_b_name: string;
+  status: 'related' | 'independent' | 'ambiguous';
+  candidate_keys: CandidateJoinKey[];
+  evidence_summary: string;
+}
+
+export interface RelationshipDetectionResponse {
+  relationships: TableRelationshipItem[];
+}
+
+export interface JoinPreviewRequest {
+  table_a_id: string;
+  table_b_id: string;
+  join_column_a: string;
+  join_column_b: string;
+  join_type?: string;
+}
+
+export interface JoinPreviewResponse {
+  table_a_name: string;
+  table_b_name: string;
+  join_column_a: string;
+  join_column_b: string;
+  join_type: string;
+  table_a_rows: number;
+  table_b_rows: number;
+  expected_rows: number;
+  unmatched_rows_a: number;
+  unmatched_rows_b: number;
+  cartesian_multiplication_risk: boolean;
+  risk_warning?: string | null;
+  columns_before_join: string[];
+  columns_after_join: string[];
+  preview_rows: Record<string, any>[];
+}
+
+export interface JoinApplyRequest {
+  table_a_id: string;
+  table_b_id: string;
+  join_column_a: string;
+  join_column_b: string;
+  join_type?: string;
+  new_dataset_name?: string | null;
 }
 

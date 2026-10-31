@@ -4,11 +4,16 @@ import type {
   CleaningRecommendation,
   CleaningAuditRecord,
   CleaningSummaryResponse,
+  CleaningProposal,
+  DatasetVersionInfo,
 } from '../types';
 import {
   fetchCleaningRecommendations,
-  previewCleaningAction,
   applyCleaningAction,
+  proposeCleaningAction,
+  approveCleaningProposal,
+  rejectCleaningProposal,
+  fetchDatasetVersions,
   fetchCleaningAudit,
   resetToRawDataset,
   getCleanedExportUrl,
@@ -22,10 +27,13 @@ interface CleanStudioProps {
 export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpdated }) => {
   const [recommendations, setRecommendations] = useState<CleaningRecommendation[]>([]);
   const [auditHistory, setAuditHistory] = useState<CleaningAuditRecord[]>([]);
+  const [versions, setVersions] = useState<DatasetVersionInfo[]>([]);
+  const [showVersions, setShowVersions] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [selectedStrategies, setSelectedStrategies] = useState<Record<string, string>>({});
   const [previewDiff, setPreviewDiff] = useState<any | null>(null);
+  const [activeProposal, setActiveProposal] = useState<CleaningProposal | null>(null);
   const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -34,12 +42,14 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
   const loadCleaningState = async () => {
     setLoading(true);
     try {
-      const [recs, audit] = await Promise.all([
+      const [recs, audit, vers] = await Promise.all([
         fetchCleaningRecommendations(datasetId),
         fetchCleaningAudit(datasetId),
+        fetchDatasetVersions(datasetId).catch(() => []),
       ]);
       setRecommendations(recs);
       setAuditHistory(audit.audit_history || []);
+      setVersions(vers);
       
       // Default strategies
       const defaults: Record<string, string> = {};
@@ -63,18 +73,81 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
   };
 
   const handlePreview = async (rec: CleaningRecommendation) => {
+    setActionInProgress(rec.id);
+    setFeedbackMsg(null);
     try {
       const strat = selectedStrategies[rec.id] || rec.strategy_options[0];
-      const preview = await previewCleaningAction({
+      const res = await proposeCleaningAction({
         dataset_id: datasetId,
         rule: rec.rule,
         column: rec.column,
         strategy: strat,
       });
-      setPreviewDiff({ ...preview, recTitle: rec.title });
+      setActiveProposal(res.proposal);
+      setPreviewDiff({
+        ...res.proposal.diff_preview,
+        recTitle: rec.title,
+        proposal_id: res.proposal.proposal_id,
+        is_consequential: res.proposal.is_consequential,
+        base_version_id: res.proposal.base_version_id,
+      });
       setShowPreviewModal(true);
     } catch (err: any) {
-      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to preview cleaning.' });
+      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to stage transformation proposal.' });
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleApproveProposal = async () => {
+    if (!activeProposal) return;
+    setActionInProgress(activeProposal.proposal_id);
+    setFeedbackMsg(null);
+    try {
+      const result: CleaningSummaryResponse = await approveCleaningProposal(activeProposal.proposal_id);
+      setAuditHistory(result.audit_history);
+      setRecommendations(result.remaining_recommendations);
+      const updatedVersions = await fetchDatasetVersions(datasetId).catch(() => []);
+      setVersions(updatedVersions);
+      setShowPreviewModal(false);
+      setActiveProposal(null);
+      
+      const newVerId = updatedVersions.length > 0 ? updatedVersions[updatedVersions.length - 1].version_id : 1;
+      setFeedbackMsg({
+        type: 'success',
+        text: `Proposal approved and applied. Dataset successfully advanced to Version v${newVerId}. Health score: ${result.current_health.overall_score}/100.`,
+      });
+
+      onDatasetUpdated({
+        ...dataset,
+        health: result.current_health,
+        metadata: {
+          ...dataset.metadata,
+          rows: result.total_records,
+        },
+      });
+    } catch (err: any) {
+      setFeedbackMsg({ type: 'error', text: err.message || 'Failed to approve proposal.' });
+    } finally {
+      setActionInProgress(null);
+    }
+  };
+
+  const handleRejectProposal = async () => {
+    if (!activeProposal) return;
+    setActionInProgress(activeProposal.proposal_id);
+    try {
+      await rejectCleaningProposal(activeProposal.proposal_id);
+      setFeedbackMsg({
+        type: 'success',
+        text: 'Proposal rejected. Active dataset was not modified.',
+      });
+    } catch (err: any) {
+      console.warn('Reject error:', err);
+    } finally {
+      setShowPreviewModal(false);
+      setActiveProposal(null);
+      setActionInProgress(null);
     }
   };
 
@@ -92,6 +165,8 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
 
       setAuditHistory(result.audit_history);
       setRecommendations(result.remaining_recommendations);
+      const updatedVersions = await fetchDatasetVersions(datasetId).catch(() => []);
+      setVersions(updatedVersions);
       setFeedbackMsg({
         type: 'success',
         text: `Successfully applied: ${rec.title}. Health score is now ${result.current_health.overall_score}/100.`,
@@ -163,10 +238,38 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
             <span style={{ fontSize: '14px', color: '#648484', background: '#FAF8F5', padding: '4px 12px', borderRadius: '8px', border: '1px solid #EAE6DF' }}>
               Active Rows: <strong style={{ color: '#0F3D3E' }}>{dataset.metadata.rows.toLocaleString()}</strong>
             </span>
+            <span style={{ fontSize: '14px', color: '#0F3D3E', background: '#E6FFFA', padding: '4px 12px', borderRadius: '8px', border: '1px solid #B2F5EA', fontWeight: 700 }}>
+              Version: v{versions.length > 0 ? versions[versions.length - 1].version_id : 0}
+            </span>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {versions.length > 0 && (
+            <button
+              onClick={() => setShowVersions(!showVersions)}
+              style={{
+                background: showVersions ? '#EAE6DF' : '#FAF8F5',
+                color: '#0F3D3E',
+                border: '1px solid #CBD5E1',
+                borderRadius: '12px',
+                padding: '10px 16px',
+                fontSize: '15px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+              title="Inspect dataset version history and lineage"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              {showVersions ? 'Hide Versions' : `Versions (${versions.length})`}
+            </button>
+          )}
           {auditHistory.length > 0 && (
             <button
               onClick={handleRevert}
@@ -220,6 +323,62 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
           </a>
         </div>
       </div>
+
+      {/* Dataset Version History Panel */}
+      {showVersions && (
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #EAE6DF',
+            borderRadius: '16px',
+            padding: '20px 24px',
+            marginBottom: '24px',
+            boxShadow: '0 2px 10px rgba(15, 61, 62, 0.04)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: 700, color: '#0F3D3E', margin: 0 }}>
+              Dataset Version Lineage
+            </h3>
+            <span style={{ fontSize: '13px', color: '#648484' }}>
+              Current Active Version: <strong>v{versions.length > 0 ? versions[versions.length - 1].version_id : 0}</strong>
+            </span>
+          </div>
+
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: '#FAF8F5', borderBottom: '2px solid #EAE6DF' }}>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Version</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Operation</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left', color: '#0F3D3E' }}>Description</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>Rows Affected</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'center', color: '#0F3D3E' }}>Total Records</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'right', color: '#0F3D3E' }}>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {versions.map((v) => (
+                  <tr key={v.version_id} style={{ borderBottom: '1px solid #F0EDE6' }}>
+                    <td style={{ padding: '10px 14px', fontWeight: 700, color: '#0F3D3E' }}>v{v.version_id}</td>
+                    <td style={{ padding: '10px 14px', color: '#476D6D', textTransform: 'capitalize' }}>
+                      {v.operation.replace(/_/g, ' ')}
+                    </td>
+                    <td style={{ padding: '10px 14px', color: '#0F3D3E' }}>{v.description}</td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', color: '#476D6D' }}>{v.affected_rows}</td>
+                    <td style={{ padding: '10px 14px', textAlign: 'center', fontWeight: 600, color: '#0F3D3E' }}>
+                      {v.total_rows.toLocaleString()}
+                    </td>
+                    <td style={{ padding: '10px 14px', textAlign: 'right', color: '#648484', fontSize: '13px' }}>
+                      {v.timestamp.slice(0, 19).replace('T', ' ')}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Notification Banner */}
       {feedbackMsg && (
@@ -546,9 +705,14 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ margin: 0, color: '#0F3D3E', fontSize: '20px', fontWeight: 700 }}>
-                Cleaning Diff Preview
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, color: '#0F3D3E', fontSize: '20px', fontWeight: 700 }}>
+                  Cleaning Transformation Proposal
+                </h3>
+                <span style={{ fontSize: '13px', color: '#648484' }}>
+                  Proposal: <strong style={{ color: '#0F3D3E' }}>{previewDiff.proposal_id || 'staged'}</strong> &bull; Base Version: <strong style={{ color: '#0F3D3E' }}>v{previewDiff.base_version_id ?? 0}</strong>
+                </span>
+              </div>
               <button
                 onClick={() => setShowPreviewModal(false)}
                 style={{ background: 'transparent', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#648484' }}
@@ -557,11 +721,33 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
               </button>
             </div>
 
+            {previewDiff.is_consequential && (
+              <div
+                style={{
+                  background: '#FFF7ED',
+                  border: '1px solid #FFEDD5',
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  marginBottom: '16px',
+                  fontSize: '13px',
+                  color: '#9A3412',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span style={{ fontSize: '16px' }}>⚠️</span>
+                <span>
+                  <strong>Consequential Action:</strong> This transformation permanently drops records or alters structure. Please verify the preview before approving.
+                </span>
+              </div>
+            )}
+
             <div style={{ background: '#FAF8F5', padding: '18px', borderRadius: '14px', border: '1px solid #EAE6DF', marginBottom: '16px' }}>
               <p style={{ margin: '0 0 10px', fontSize: '15px', fontWeight: 600, color: '#0F3D3E' }}>
                 {previewDiff.summary}
               </p>
-              <div style={{ fontSize: '14px', color: '#648484', display: 'flex', gap: '18px' }}>
+              <div style={{ fontSize: '14px', color: '#648484', display: 'flex', gap: '18px', flexWrap: 'wrap' }}>
                 <span>Affected Rows: <strong style={{ color: '#0F3D3E' }}>{previewDiff.affected_rows}</strong></span>
                 <span>Strategy: <strong style={{ color: '#0F3D3E' }}>{previewDiff.strategy}</strong></span>
                 {previewDiff.fill_value !== undefined && (
@@ -590,22 +776,61 @@ export const CleanStudio: React.FC<CleanStudioProps> = ({ dataset, onDatasetUpda
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => setShowPreviewModal(false)}
+                onClick={handleRejectProposal}
+                disabled={actionInProgress !== null}
                 style={{
-                  background: '#FAF8F5',
-                  color: '#476D6D',
-                  border: '1px solid #CBD5E1',
+                  background: '#FEF2F2',
+                  color: '#DC2626',
+                  border: '1px solid #FECACA',
                   borderRadius: '10px',
                   padding: '9px 18px',
                   fontSize: '14px',
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: actionInProgress !== null ? 'not-allowed' : 'pointer',
+                  opacity: actionInProgress !== null ? 0.6 : 1,
                 }}
+                title="Reject proposal without modifying active dataset"
               >
-                Close Preview
+                Reject Proposal
               </button>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  onClick={() => setShowPreviewModal(false)}
+                  style={{
+                    background: '#FAF8F5',
+                    color: '#476D6D',
+                    border: '1px solid #CBD5E1',
+                    borderRadius: '10px',
+                    padding: '9px 18px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApproveProposal}
+                  disabled={actionInProgress !== null}
+                  style={{
+                    background: '#0F3D3E',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '9px 20px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    cursor: actionInProgress !== null ? 'not-allowed' : 'pointer',
+                    opacity: actionInProgress !== null ? 0.7 : 1,
+                    boxShadow: '0 2px 8px rgba(15, 61, 62, 0.2)',
+                  }}
+                >
+                  {actionInProgress === activeProposal?.proposal_id ? 'Applying...' : 'Approve & Apply'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
